@@ -25,18 +25,21 @@ Locked and hidden layers are skipped on purpose, so you can protect any layer yo
 Select the first keyframe on at least 2 layers, set the frame delay and the layer order, then press **Apply**. The panel **Undo** button reverses the whole operation at once, while **Ctrl+Z** undoes it step by step.
 
 <!-- Replace with the GitHub attachment URL for docs/videos/cep-panel-tutorial.mp4 (drag the file into the README editor on github.com) -->
-https://github.com/user-attachments/assets/CEP-PANEL-VIDEO-ID
 
-[Watch cep-panel-tutorial.mp4](docs/videos/cep-panel-tutorial.mp4) (28 seconds)
+
+https://github.com/user-attachments/assets/bc4cc7fd-b4d9-4137-b6f9-341aa94fc2ff
+
 
 ### 2. Commands menu and keyboard shortcut
 
 Run DelayerZ from **Commands > DelayerZ**, pick the options in the dialog, and add a shortcut in **Edit > Keyboard Shortcuts** (search for "DelayerZ") for faster access.
 
 <!-- Replace with the GitHub attachment URL for docs/videos/jsx-tutorial.mp4 (drag the file into the README editor on github.com) -->
-https://github.com/user-attachments/assets/JSX-TUTORIAL-VIDEO-ID
 
-[Watch jsx-tutorial.mp4](docs/videos/jsx-tutorial.mp4) (42 seconds)
+
+https://github.com/user-attachments/assets/c65d4140-fff8-4dfc-bdbb-df289a4a35e7
+
+
 
 ## Installation
 
