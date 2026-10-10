@@ -2,8 +2,6 @@
 
 Stagger animations across layers in Adobe Animate with one click.
 
-![DelayerZ panel after applying a 3 frame stagger to 6 layers](docs/images/cep-panel-preview.jpg)
-
 - **Version:** 1.3.0
 - **Host:** Adobe Animate 2024 or newer (Windows)
 - **Ships as:** a dockable CEP panel and a Commands menu script
@@ -33,8 +31,6 @@ Select the first keyframe on at least 2 layers, set the frame delay and the laye
 ### 2. Commands menu and keyboard shortcut
 
 Run DelayerZ from **Commands > DelayerZ**, pick the options in the dialog, and add a shortcut in **Edit > Keyboard Shortcuts** (search for "DelayerZ") for faster access.
-
-[![Commands menu tutorial preview](docs/images/jsx-tutorial-preview.jpg)](docs/videos/jsx-tutorial.mp4)
 
 <video src="docs/videos/jsx-tutorial.mp4" controls width="100%"></video>
 
@@ -84,7 +80,6 @@ proj_DelayerZ/
   scripts/
     package.js            Builds the release zip (npm run package)
   docs/
-    images/               README screenshots
     videos/               Tutorial videos
   package.json
   README.md
