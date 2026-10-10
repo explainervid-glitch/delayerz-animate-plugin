@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DelayerZ</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <div class="panel">
+
+        <!-- Header -->
+        <div class="header">
+            <span class="header-icon">⏳</span>
+            <h1>DelayerZ</h1>
+            <span class="version">v1.3.0</span>
+        </div>
+
+        <!-- Delay Input -->
+        <div class="field">
+            <label class="field-label" for="delay">Frame Delay</label>
+            <input type="number" id="delay" value="5" min="1" max="999">
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Mode Radio -->
+        <div class="field">
+            <label class="field-label">Layer Order</label>
+            <div class="radio-group">
+
+                <label class="radio-option">
+                    <input type="radio" name="mode" value="normal" checked>
+                    <span class="radio-label">Bottom to Top</span>
+                    <span class="radio-sub">↑</span>
+                </label>
+
+                <label class="radio-option">
+                    <input type="radio" name="mode" value="inverted">
+                    <span class="radio-label">Top to Bottom</span>
+                    <span class="radio-sub">↓</span>
+                </label>
+
+                <label class="radio-option">
+                    <input type="radio" name="mode" value="random">
+                    <span class="radio-label">Random</span>
+                    <span class="radio-sub">⇄</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Apply + Undo buttons -->
+        <div class="btn-row">
+            <button id="applyBtn">Apply</button>
+            <button id="undoBtn" disabled title="Undo the whole DelayerZ operation in one step">↩ Undo</button>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="status"></div>
+
+        <!-- Hint -->
+        <p class="hint">Zeus 2026<br></p>
+
+    </div>
+
+    <!-- CEP library (required) -->
+    <script src="js/CSInterface.js"></script>
+    <!-- Panel Logic -->
+    <script src="js/main.js"></script>
+
+</body>
+
+</html>

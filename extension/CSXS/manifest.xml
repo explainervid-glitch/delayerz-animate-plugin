@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionManifest Version="5.0" ExtensionBundleId="com.zeus.delayerz" ExtensionBundleVersion="1.3.0"
+    ExtensionBundleName="DelayerZ Bundle" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <ExtensionList>
+        <Extension Id="com.zeus.delayerz.panel" Version="1.3.0" />
+    </ExtensionList>
+    <ExecutionEnvironment>
+        <HostList>
+            <!-- FLPR = Adobe Animate | [24.0,99.9] = Animate 2024 and newer -->
+            <Host Name="FLPR" Version="[24.0,99.9]" />
+        </HostList>
+        <LocaleList>
+            <Locale Code="All" />
+        </LocaleList>
+        <RequiredRuntimeList>
+            <!-- CSXS 9+ is required for Animate 2024 -->
+            <RequiredRuntime Name="CSXS" Version="9.0" />
+        </RequiredRuntimeList>
+    </ExecutionEnvironment>
+    <DispatchInfoList>
+        <Extension Id="com.zeus.delayerz.panel">
+            <DispatchInfo>
+                <Resources>
+                    <MainPath>./DelayerZ.html</MainPath>
+                    <ScriptPath>./jsx/DelayerZ.jsx</ScriptPath>
+                </Resources>
+                <Lifecycle>
+                    <AutoVisible>true</AutoVisible>
+                </Lifecycle>
+                <UI>
+                    <Type>Panel</Type>
+                    <Menu>DelayerZ</Menu>
+                    <Geometry>
+                        <Size>
+                            <Height>340</Height>
+                            <Width>200</Width>
+                        </Size>
+                    </Geometry>
+                </UI>
+            </DispatchInfo>
+        </Extension>
+    </DispatchInfoList>
+</ExtensionManifest>

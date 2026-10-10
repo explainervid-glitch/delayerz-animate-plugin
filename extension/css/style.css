@@ -1,0 +1,290 @@
+/* ============================================================
+   DelayerZ Panel - Dark theme matching Adobe Animate UI
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --bg-base: #1e1e1e;
+    --bg-panel: #252525;
+    --bg-input: #2d2d2d;
+    --bg-hover: #3a3a3a;
+    --border: #3d3d3d;
+    --accent: #2892e9;
+    --accent-dim: #0078d4cc;
+    --text-primary: #d4d4d4;
+    --text-muted: #888;
+    --text-label: #aaa;
+    --success: #4caf78;
+    --error: #e05555;
+    --info: #6ab0d8;
+    --radius: 4px;
+}
+
+body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    padding: 0;
+    margin: 0;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Panel Container ---- */
+.panel {
+    padding: 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ---- Header ---- */
+.header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.header-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.header h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+}
+
+.header span.version {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ---- Field Group ---- */
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.field label.field-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-label);
+}
+
+/* ---- Number Input ---- */
+input[type="number"] {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 6px 9px;
+    outline: none;
+    transition: border-color 0.15s;
+    -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+    filter: invert(0.6);
+}
+
+input[type="number"]:focus {
+    border-color: var(--accent);
+}
+
+/* ---- Radio Group ---- */
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    user-select: none;
+}
+
+.radio-option:hover {
+    background: var(--bg-hover);
+    border-color: #555;
+}
+
+.radio-option input[type="radio"] {
+    accent-color: var(--accent);
+    width: 13px;
+    height: 13px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.radio-option input[type="radio"]:checked+.radio-label {
+    color: var(--accent);
+}
+
+.radio-label {
+    font-size: 11px;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.radio-sub {
+    font-size: 9px;
+    color: var(--text-label);
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ---- Divider ---- */
+.divider {
+    height: 1px;
+    background: var(--border);
+}
+
+/* ---- Apply Button ---- */
+#applyBtn {
+    width: 100%;
+    padding: 9px 14px;
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    border-radius: var(--radius);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+}
+
+#applyBtn:hover {
+    background: #1a547a;
+}
+
+#applyBtn:active {
+    background: var(--accent-dim);
+    transform: scale(0.98);
+}
+
+#applyBtn:disabled {
+    background: #555;
+    color: #888;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ---- Status Message ---- */
+.status {
+    font-size: 10px;
+    line-height: 1.5;
+    padding: 6px 8px;
+    border-radius: var(--radius);
+    border-left: 3px solid transparent;
+    min-height: 28px;
+    display: none;
+    word-break: break-word;
+}
+
+.status:not(:empty) {
+    display: block;
+}
+
+.status.success {
+    background: rgba(76, 175, 120, 0.12);
+    border-left-color: var(--success);
+    color: var(--success);
+}
+
+.status.error {
+    background: rgba(224, 85, 85, 0.12);
+    border-left-color: var(--error);
+    color: var(--error);
+}
+
+.status.info {
+    background: rgba(106, 176, 216, 0.1);
+    border-left-color: var(--info);
+    color: var(--info);
+}
+
+/* ---- Footer hint ---- */
+.hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.5;
+}
+
+/* ---- Apply + Undo button row ---- */
+.btn-row {
+    display: flex;
+    gap: 6px;
+}
+
+#applyBtn {
+    flex: 1;
+}
+
+#undoBtn {
+    flex-shrink: 0;
+    padding: 9px 12px;
+    background: var(--bg-input);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+#undoBtn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: #929292;
+}
+
+#undoBtn:active:not(:disabled) {
+    background: #333;
+}
+
+#undoBtn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
