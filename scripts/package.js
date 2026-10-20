@@ -44,6 +44,18 @@ function checkVersions() {
         fail("Version mismatch: package.json is " + version +
             " but CSXS/manifest.xml is " + (m ? m[1] : "missing") + ". Update both.");
     }
+    // The version zeploy's usage reporting sends (see README, Usage reporting).
+    const usage = 'zeployUsageV1("com.zeus.delayerz", "' + version + '")';
+    for (const rel of ["jsx/DelayerZ.jsx", "jsfl/DelayerZ.jsfl"]) {
+        if (!fs.readFileSync(path.join(EXTENSION, rel), "utf8").includes(usage)) {
+            fail("Version mismatch: extension/" + rel + " does not report usage as " + version +
+                ". Update its zeployUsageV1(...) line.");
+        }
+    }
+    const zeploy = JSON.parse(fs.readFileSync(path.join(ROOT, "zeploy.json"), "utf8"));
+    if (zeploy.version !== version) {
+        fail("Version mismatch: package.json is " + version + " but zeploy.json is " + zeploy.version + ". Update both.");
+    }
 }
 
 // ------------------------------------------------------------

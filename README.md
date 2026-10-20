@@ -2,7 +2,7 @@
 
 Stagger animations across layers in Adobe Animate with one click.
 
-- **Version:** 1.3.0
+- **Version:** 1.4.0
 - **Host:** Adobe Animate 2024 or newer (Windows)
 - **Ships as:** a dockable CEP panel and a Commands menu script
 
@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/c65d4140-fff8-4dfc-bdbb-df289a4a35e7
 
 ## Installation
 
-1. Unzip `DelayerZ-v1.3.0.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
+1. Unzip `DelayerZ-v1.4.0.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
 2. Double click `install.bat` and accept the administrator prompt.
 3. If Animate is open, the installer asks whether to close it.
 4. Start Animate and open **Window > Extensions > DelayerZ**.
@@ -67,6 +67,34 @@ Notes:
 - The panel Undo works once per Apply. It refuses to run if layers were added or removed after Apply, to protect your timeline.
 - When the animation starts after frame 1, empty keyframes left by the move are cleared automatically.
 
+## Usage reporting
+
+DelayerZ counts how often it is used, for the team's zeploy dashboard. Each
+time a stagger is applied from the panel ("apply"), undone from the panel
+("undo"), or applied from the Commands menu ("command"), it appends one line
+to `%LOCALAPPDATA%\zeploy\usage\com.zeus.delayerz.jsonl`; an unexpected
+error in apply or undo is counted as an error. The zeploy agent sends daily
+totals to the admin app and deletes the file.
+
+- Only the plugin id, version, the event name and how long it took are
+  written: no file, layer or user names.
+- Nothing is written on a PC without zeploy (no `%LOCALAPPDATA%\zeploy`
+  folder), and nothing is ever sent over the network by DelayerZ itself.
+- Cancelled dialogs and messages such as "select at least 2 layers" are not
+  counted.
+
+The code is zeploy's JSFL helper (`zeployUsageV1`), pasted unchanged at the
+top of `jsx/DelayerZ.jsx` and `jsfl/DelayerZ.jsfl` between the "zeploy
+usage helper" markers. The contract is `docs/plugin-usage.md` in the zeploy
+repository.
+
+## Installing with zeploy
+
+`zeploy.json` lets the zeploy admin app install DelayerZ the way
+`install.bat` does: the panel as `CEP\extensions\DelayerZ` and
+`DelayerZ.jsfl` in every Animate `Configuration\Commands` folder. Add this
+project folder under **Add package** in zeploy.
+
 ## Project structure
 
 ```
@@ -87,6 +115,7 @@ proj_DelayerZ/
   docs/
     videos/               Tutorial videos
   package.json
+  zeploy.json             How zeploy installs it
   README.md
 ```
 
@@ -100,7 +129,7 @@ npm run package
 
 Output: `dist/DelayerZ-v<version>.zip`, containing `DelayerZ/`, `install.bat` and `operator.ps1`.
 
-To release a new version, update `version` in `package.json` and `ExtensionBundleVersion` in `extension/CSXS/manifest.xml` (the build stops if they differ), plus the label in `extension/DelayerZ.html` and `$AppVersion` in `installer/operator.ps1`.
+To release a new version, update `version` in `package.json` and `ExtensionBundleVersion` in `extension/CSXS/manifest.xml` (the build stops if they differ), plus the label in `extension/DelayerZ.html`, `$AppVersion` in `installer/operator.ps1`, `version` in `zeploy.json`, and the version in the `zeployUsageV1(...)` lines of `extension/jsx/DelayerZ.jsx` and `extension/jsfl/DelayerZ.jsfl` (the build also checks the last two).
 
 ```bash
 npm run clean
