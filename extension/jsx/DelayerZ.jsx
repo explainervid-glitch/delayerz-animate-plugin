@@ -112,7 +112,7 @@ var _lastOp = null;
 // an error when one fails unexpectedly. Validation messages ("select at
 // least 2 layers") are not counted. Keep the version in step with
 // CSXS/manifest.xml (npm run package checks it).
-var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.4.1");
+var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.5.0");
 
 // --- HELPER: Array.indexOf replacement (not available in ES3) ---
 function arrContains(arr, val) {
