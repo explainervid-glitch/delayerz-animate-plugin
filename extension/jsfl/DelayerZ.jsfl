@@ -109,7 +109,7 @@ function zeployUsageV1(plugin, version) {
     // dialog is cancelled or the selection is wrong). Same id as the panel,
     // so both count as DelayerZ. Keep the version in step with
     // CSXS/manifest.xml (npm run package checks it).
-    var usage = zeployUsageV1("com.zeus.delayerz", "1.4.0");
+    var usage = zeployUsageV1("com.zeus.delayerz", "1.4.1");
     var usageStart; // set once the dialog is accepted, so it times the work only
 
     // --- HELPER: Array.indexOf replacement (not available in ES3) ---
@@ -118,6 +118,16 @@ function zeployUsageV1(plugin, version) {
             if (arr[x] === val) return true;
         }
         return false;
+    }
+
+    // --- HELPER: drop folder and camera layers (no frames to move) ---
+    function filterMovableLayers(indices) {
+        var kept = [];
+        for (var x = 0; x < indices.length; x++) {
+            var type = tl.layers[indices[x]].layerType;
+            if (type !== "folder" && type !== "camera") kept.push(indices[x]);
+        }
+        return kept;
     }
 
     // ============================================================
@@ -176,6 +186,10 @@ function zeployUsageV1(plugin, version) {
             }
         }
     }
+
+    // Folder and camera layers are dropped before counting, so a selected
+    // folder header does not count as one of the 2 layers.
+    targetLayers = filterMovableLayers(targetLayers);
 
     if (targetLayers.length < 2) {
         alert("DelayerZ Error: Select at least 2 layers in the timeline before running this command.");
@@ -281,20 +295,40 @@ function zeployUsageV1(plugin, version) {
     // "inverted" -> ascending order is already correct
 
     // ============================================================
-    // STEP 7: APPLY FRAME SHIFTS
+    // STEP 7: PLAN THE SHIFTS, CHECK THEM, THEN APPLY
+    //
+    // shifts[i] is how far orderedLayers[i] moves: 0 for the first layer
+    // and for locked or hidden layers, which are left alone.
+    // A layer that moves must have frames at or after the playhead.
+    // Otherwise its cut range is empty, cutFrames() cuts nothing, and
+    // pasteFrames() pastes the previous layer's frames from the clipboard.
+    // Everything is checked before the first frame moves.
     // ============================================================
 
     var layerIdx, layer, shiftAmount, originalEnd;
+    var shifts = [];
+
+    for (i = 0; i < orderedLayers.length; i++) {
+        layer = tl.layers[orderedLayers[i]];
+        shifts.push(layer.locked || !layer.visible ? 0 : i * absDelay);
+
+        if (shifts[i] > 0 && animStartFrame >= layer.frames.length) {
+            alert("DelayerZ Error: \"" + layer.name + "\" has no frames at or after frame " +
+                (animStartFrame + 1) + ". Move the playhead or deselect that layer.");
+            fl.trace("[DelayerZ] ERROR: \"" + layer.name + "\" has no frames at or after the playhead.");
+            return;
+        }
+    }
 
     for (i = 0; i < orderedLayers.length; i++) {
         layerIdx = orderedLayers[i];
         layer = tl.layers[layerIdx];
-        shiftAmount = i * absDelay;
+        shiftAmount = shifts[i];
         originalEnd = layer.frames.length;
 
         tl.currentLayer = layerIdx;
 
-        if (shiftAmount > 0 && !layer.locked && layer.visible) {
+        if (shiftAmount > 0) {
             tl.setSelectedFrames(animStartFrame, originalEnd);
             tl.cutFrames();
             tl.setSelectedFrames(animStartFrame + shiftAmount, animStartFrame + shiftAmount);
@@ -320,9 +354,9 @@ function zeployUsageV1(plugin, version) {
         for (i = 0; i < orderedLayers.length; i++) {
             layerIdx = orderedLayers[i];
             layer = tl.layers[layerIdx];
-            shiftAmount = i * absDelay;
+            shiftAmount = shifts[i];
 
-            if (shiftAmount === 0 || layer.locked || !layer.visible) continue;
+            if (shiftAmount === 0) continue;
 
             tl.currentLayer = layerIdx;
 

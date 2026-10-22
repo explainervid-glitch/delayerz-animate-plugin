@@ -2,7 +2,7 @@
 
 Stagger animations across layers in Adobe Animate with one click.
 
-- **Version:** 1.4.0
+- **Version:** 1.4.1
 - **Host:** Adobe Animate 2024 or newer (Windows)
 - **Ships as:** a dockable CEP panel and a Commands menu script
 
@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/c65d4140-fff8-4dfc-bdbb-df289a4a35e7
 
 ## Installation
 
-1. Unzip `DelayerZ-v1.4.0.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
+1. Unzip `DelayerZ-v1.4.1.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
 2. Double click `install.bat` and accept the administrator prompt.
 3. If Animate is open, the installer asks whether to close it.
 4. Start Animate and open **Window > Extensions > DelayerZ**.
@@ -57,14 +57,16 @@ https://github.com/user-attachments/assets/c65d4140-fff8-4dfc-bdbb-df289a4a35e7
 ## Usage
 
 1. In the timeline, select the starting keyframe on 2 or more layers (drag across the layers, or click the layer headers).
-2. Enter the **Frame Delay** (frames between each layer).
-3. Choose the **Layer Order**: Bottom to Top, Top to Bottom, or Random.
+2. Set **Delay (frames)**, the frames between each layer: drag the number left or right, click it to type, or use **−** / **+**.
+3. Choose **Start from**: Bottom, Top, or Random.
 4. Click **Apply**.
+
+Messages (done, or why it could not run) go to the log. Open it with the list icon next to the version, at the bottom of the panel. While the log is closed, a dot on the icon shows a new message: green for success, red for an error.
 
 Notes:
 
 - Locked or hidden layers are not moved.
-- The panel Undo works once per Apply. It refuses to run if layers were added or removed after Apply, to protect your timeline.
+- The panel Undo works once per Apply, in the document and timeline where Apply ran. It refuses to run if layers were added, removed or moved after Apply, to protect your timeline.
 - When the animation starts after frame 1, empty keyframes left by the move are cleared automatically.
 
 ## Usage reporting
@@ -103,6 +105,7 @@ proj_DelayerZ/
     CSXS/manifest.xml     Extension manifest (host FLPR, Animate 2024+)
     DelayerZ.html         Panel UI
     css/style.css         Panel styles
+    fonts/                IBM Plex Sans 400 + 600 (bundled, OFL.txt licence)
     js/main.js            Panel logic, talks to the JSX bridge
     js/CSInterface.js     Adobe CEP library
     jsx/DelayerZ.jsx      Stagger and undo logic (runs inside Animate)

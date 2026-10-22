@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="5.0" ExtensionBundleId="com.zeus.delayerz" ExtensionBundleVersion="1.4.0"
+<ExtensionManifest Version="5.0" ExtensionBundleId="com.zeus.delayerz" ExtensionBundleVersion="1.4.1"
     ExtensionBundleName="DelayerZ Bundle" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <ExtensionList>
-        <Extension Id="com.zeus.delayerz.panel" Version="1.4.0" />
+        <Extension Id="com.zeus.delayerz.panel" Version="1.4.1" />
     </ExtensionList>
     <ExecutionEnvironment>
         <HostList>
@@ -32,7 +32,7 @@
                     <Menu>DelayerZ</Menu>
                     <Geometry>
                         <Size>
-                            <Height>340</Height>
+                            <Height>250</Height>
                             <Width>200</Width>
                         </Size>
                     </Geometry>

@@ -112,7 +112,7 @@ var _lastOp = null;
 // an error when one fails unexpectedly. Validation messages ("select at
 // least 2 layers") are not counted. Keep the version in step with
 // CSXS/manifest.xml (npm run package checks it).
-var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.4.0");
+var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.4.1");
 
 // --- HELPER: Array.indexOf replacement (not available in ES3) ---
 function arrContains(arr, val) {
@@ -120,6 +120,16 @@ function arrContains(arr, val) {
         if (arr[x] === val) return true;
     }
     return false;
+}
+
+// --- HELPER: drop folder and camera layers (no frames to move) ---
+function filterMovableLayers(tl, indices) {
+    var kept = [];
+    for (var x = 0; x < indices.length; x++) {
+        var type = tl.layers[indices[x]].layerType;
+        if (type !== "folder" && type !== "camera") kept.push(indices[x]);
+    }
+    return kept;
 }
 
 /**
@@ -204,6 +214,10 @@ function applyDelayerZ(delayVal, mode) {
             }
         }
 
+        // Folder and camera layers are dropped before counting, so a selected
+        // folder header does not count as one of the 2 layers.
+        targetLayers = filterMovableLayers(tl, targetLayers);
+
         if (targetLayers.length < 2) {
             return "ERROR: Select at least 2 layers in the timeline.";
         }
@@ -257,24 +271,39 @@ function applyDelayerZ(delayVal, mode) {
         }
         // "inverted" -> ascending order is already correct
 
-        // --- 5. SAVE ORIGINAL LENGTHS BEFORE SHIFTING (for undo) ---
+        // --- 5. PLAN THE SHIFTS AND CHECK THEM BEFORE MOVING ANYTHING ---
+        // shifts[i] is how far orderedLayers[i] moves: 0 for the first layer
+        // and for locked or hidden layers, which are left alone. Undo uses
+        // this record, not the layers' locked/hidden state at Undo time.
+        //
+        // A layer that moves must have frames at or after the playhead.
+        // Otherwise its cut range is empty, cutFrames() cuts nothing, and
+        // pasteFrames() pastes the previous layer's frames from the clipboard.
+        var layerIdx, layer, shiftAmount, originalEnd, f, fr;
+        var shifts = [];
         var originalLengths = [];
+
         for (i = 0; i < orderedLayers.length; i++) {
-            originalLengths.push(tl.layers[orderedLayers[i]].frames.length);
+            layer = tl.layers[orderedLayers[i]];
+            shifts.push(layer.locked || !layer.visible ? 0 : i * absDelay);
+            originalLengths.push(layer.frames.length);
+
+            if (shifts[i] > 0 && animStartFrame >= layer.frames.length) {
+                return "ERROR: \"" + layer.name + "\" has no frames at or after frame " +
+                    (animStartFrame + 1) + ". Move the playhead or deselect that layer.";
+            }
         }
 
         // --- 6. APPLY FRAME SHIFTS ---
-        var layerIdx, layer, shiftAmount, originalEnd, f, fr;
-
         for (i = 0; i < orderedLayers.length; i++) {
             layerIdx = orderedLayers[i];
             layer = tl.layers[layerIdx];
-            shiftAmount = i * absDelay;
+            shiftAmount = shifts[i];
             originalEnd = layer.frames.length;
 
             tl.currentLayer = layerIdx;
 
-            if (shiftAmount > 0 && !layer.locked && layer.visible) {
+            if (shiftAmount > 0) {
                 tl.setSelectedFrames(animStartFrame, originalEnd);
                 tl.cutFrames();
                 tl.setSelectedFrames(animStartFrame + shiftAmount, animStartFrame + shiftAmount);
@@ -298,9 +327,9 @@ function applyDelayerZ(delayVal, mode) {
             for (i = 0; i < orderedLayers.length; i++) {
                 layerIdx = orderedLayers[i];
                 layer = tl.layers[layerIdx];
-                shiftAmount = i * absDelay;
+                shiftAmount = shifts[i];
 
-                if (shiftAmount === 0 || layer.locked || !layer.visible) continue;
+                if (shiftAmount === 0) continue;
 
                 tl.currentLayer = layerIdx;
 
@@ -347,12 +376,28 @@ function applyDelayerZ(delayVal, mode) {
         }
 
         // --- 8. SAVE STATE FOR UNDO ---
+        // Where Apply ran (document + timeline), and per layer: its name (to
+        // detect reordering), how far it moved, and its length before and
+        // after Apply (a longer endLen means the alignment step extended it).
+        var layerRecords = [];
+        for (i = 0; i < orderedLayers.length; i++) {
+            layer = tl.layers[orderedLayers[i]];
+            layerRecords.push({
+                index: orderedLayers[i],
+                name: layer.name,
+                shift: shifts[i],
+                origLen: originalLengths[i],
+                endLen: layer.frames.length
+            });
+        }
+
         _lastOp = {
-            orderedLayers: orderedLayers,
-            delay: absDelay,
+            docId: doc.id,
+            docName: doc.name,
+            timelineName: tl.name,
             startFrame: animStartFrame,
-            originalLengths: originalLengths,
-            layerCount: tl.layers.length  // snapshot for stale-state detection on undo
+            layerCount: tl.layers.length,  // snapshot for stale-state detection on undo
+            layers: layerRecords
         };
 
         // --- 9. RETURN TO INITIAL FRAME POSITION ---
@@ -384,68 +429,77 @@ function undoDelayerZ() {
 
         var tl = doc.getTimeline();
         var op = _lastOp;
-        var i, layerIdx, layer, shiftAmount, origLen, currentLen;
+        var i, rec, layer, currentLen;
 
-        // --- GUARD 1: detect stale state ---
-        // If the layer count changed since Apply, the stored indices may be
-        // invalid or pointing to completely different layers. Abort safely.
-        if (tl.layers.length !== op.layerCount) {
-            _lastOp = null;
-            return "ERROR: Timeline structure changed since Apply (layers were added or removed). Undo is not safe.";
+        // All checks run before the first frame moves, so a refused Undo
+        // never leaves the timeline half restored.
+
+        // --- CHECK 1: same document and timeline as Apply ---
+        // The undo state is shared by every open document and symbol. Keep it,
+        // so Undo works once the user switches back.
+        if (doc.id !== op.docId || tl.name !== op.timelineName) {
+            return "ERROR: Undo only works where Apply ran: switch back to \"" +
+                op.docName + "\" > \"" + op.timelineName + "\".";
         }
 
-        // Process in reverse: start from the LAST layer (largest shift) down to the first.
-        // This prevents frame position conflicts between layers during restoration.
-        for (i = op.orderedLayers.length - 1; i >= 0; i--) {
-            layerIdx = op.orderedLayers[i];
-            shiftAmount = i * op.delay;
-            origLen = op.originalLengths[i];
-
-            // --- GUARD 2: layer index bounds check ---
-            // The stored index may be out of range if layers were reordered/removed.
-            if (layerIdx >= tl.layers.length) {
+        // --- CHECK 2: no layers added, removed or reordered ---
+        // The record stores layers by position; a changed position would
+        // point Undo at a different layer.
+        if (tl.layers.length !== op.layerCount) {
+            _lastOp = null;
+            return "ERROR: Layers were added or removed since Apply. Undo with Ctrl+Z.";
+        }
+        for (i = 0; i < op.layers.length; i++) {
+            rec = op.layers[i];
+            if (tl.layers[rec.index].name !== rec.name) {
                 _lastOp = null;
-                return "ERROR: Layer index " + layerIdx + " is out of range. Timeline was modified after Apply. Undo aborted.";
+                return "ERROR: Layers were moved since Apply. Undo with Ctrl+Z.";
+            }
+        }
+
+        // --- CHECK 3: every layer Apply changed can be restored ---
+        // Only layers Apply moved (shift > 0) or extended (endLen > origLen)
+        // are restored, whatever their locked/hidden state is now.
+        for (i = 0; i < op.layers.length; i++) {
+            rec = op.layers[i];
+            if (rec.shift === 0 && rec.endLen <= rec.origLen) continue;
+            layer = tl.layers[rec.index];
+
+            if (layer.locked || (rec.shift > 0 && !layer.visible)) {
+                return "ERROR: Unlock and show layer \"" + rec.name + "\", then click Undo again.";
             }
 
-            layer = tl.layers[layerIdx];
-
-            // --- GUARD 3: null layer check ---
-            if (!layer) {
-                _lastOp = null;
-                return "ERROR: Could not access layer at index " + layerIdx + ". Undo aborted.";
-            }
-
-            tl.currentLayer = layerIdx;
+            // An empty or inverted range here means the layer was edited after
+            // Apply (often a native Ctrl+Z that partly reverted the stagger).
             currentLen = layer.frames.length;
+            if (rec.shift > 0 && op.startFrame + rec.shift >= currentLen) {
+                _lastOp = null;
+                return "ERROR: Frame range out of bounds on layer \"" + rec.name + "\" (expected content at frame " + (op.startFrame + rec.shift) + ", layer has " + currentLen + " frames). Timeline was modified after Apply. Undo aborted.";
+            }
+        }
 
-            if (!layer.locked && layer.visible) {
+        // --- RESTORE ---
+        // Process in reverse: start from the LAST layer (largest shift) down to the first.
+        for (i = op.layers.length - 1; i >= 0; i--) {
+            rec = op.layers[i];
+            if (rec.shift === 0 && rec.endLen <= rec.origLen) continue;
+            layer = tl.layers[rec.index];
 
-                if (shiftAmount > 0) {
+            tl.currentLayer = rec.index;
 
-                    // --- GUARD 4: invalid frame range check ---
-                    // If startFrame + shiftAmount >= currentLen the selection range is
-                    // empty or inverted -- setSelectedFrames would crash Animate.
-                    // This typically happens when the user pressed native Ctrl+Z
-                    // (partially reverting the stagger) before clicking Undo in the panel.
-                    if (op.startFrame + shiftAmount >= currentLen) {
-                        _lastOp = null;
-                        return "ERROR: Frame range out of bounds on layer \"" + layer.name + "\" (expected content at frame " + (op.startFrame + shiftAmount) + ", layer has " + currentLen + " frames). Timeline was modified after Apply. Undo aborted.";
-                    }
+            if (rec.shift > 0) {
+                // Cut from the shifted position to the end of the layer,
+                // then paste back at the original position.
+                tl.setSelectedFrames(op.startFrame + rec.shift, layer.frames.length);
+                tl.cutFrames();
+                tl.setSelectedFrames(op.startFrame, op.startFrame);
+                tl.pasteFrames();
+            }
 
-                    // Cut from the shifted position to the end of the layer,
-                    // then paste back at the original position.
-                    tl.setSelectedFrames(op.startFrame + shiftAmount, currentLen);
-                    tl.cutFrames();
-                    tl.setSelectedFrames(op.startFrame, op.startFrame);
-                    tl.pasteFrames();
-                }
-
-                // Trim any extra frames (leftover from alignment or paste) back to original length
-                currentLen = layer.frames.length;
-                if (currentLen > origLen) {
-                    tl.removeFrames(origLen, currentLen);
-                }
+            // Trim any extra frames (leftover from alignment or paste) back to original length
+            currentLen = layer.frames.length;
+            if (currentLen > rec.origLen) {
+                tl.removeFrames(rec.origLen, currentLen);
             }
         }
 
@@ -465,4 +519,13 @@ function undoDelayerZ() {
         delayerzUsage.error("undo");
         return "ERROR: " + err.toString();
     }
+}
+
+/**
+ * Tells the panel whether there is an Apply to undo, so the Undo button
+ * follows the real state (a refused Undo or a rejected Apply keeps it).
+ * @returns {string} - "1" or "0"
+ */
+function canUndoDelayerZ() {
+    return _lastOp ? "1" : "0";
 }

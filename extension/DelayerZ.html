@@ -12,59 +12,53 @@
 
     <div class="panel">
 
-        <!-- Header -->
-        <div class="header">
-            <span class="header-icon">⏳</span>
-            <h1>DelayerZ</h1>
-            <span class="version">v1.4.0</span>
+        <!-- Delay -->
+        <div class="field">
+            <label class="field-label" for="delay">Delay (frames)</label>
+            <div class="stepper">
+                <button id="delayDown" type="button" tabindex="-1" title="1 frame less">&minus;</button>
+                <input type="number" id="delay" value="5" min="1" max="999" title="Drag left or right to change. Click to type.">
+                <button id="delayUp" type="button" tabindex="-1" title="1 frame more">+</button>
+            </div>
         </div>
 
-        <!-- Delay Input -->
+        <!-- Order -->
         <div class="field">
-            <label class="field-label" for="delay">Frame Delay</label>
-            <input type="number" id="delay" value="5" min="1" max="999">
-        </div>
-
-        <div class="divider"></div>
-
-        <!-- Mode Radio -->
-        <div class="field">
-            <label class="field-label">Layer Order</label>
-            <div class="radio-group">
-
-                <label class="radio-option">
-                    <input type="radio" name="mode" value="normal" checked>
-                    <span class="radio-label">Bottom to Top</span>
-                    <span class="radio-sub">↑</span>
+            <span class="field-label">Start from</span>
+            <div class="segmented" role="radiogroup">
+                <label title="Bottom layer starts first, then upward">
+                    <input type="radio" name="mode" value="normal" checked><span>Bottom</span>
                 </label>
-
-                <label class="radio-option">
-                    <input type="radio" name="mode" value="inverted">
-                    <span class="radio-label">Top to Bottom</span>
-                    <span class="radio-sub">↓</span>
+                <label title="Top layer starts first, then downward">
+                    <input type="radio" name="mode" value="inverted"><span>Top</span>
                 </label>
-
-                <label class="radio-option">
-                    <input type="radio" name="mode" value="random">
-                    <span class="radio-label">Random</span>
-                    <span class="radio-sub">⇄</span>
+                <label title="Layers start in random order">
+                    <input type="radio" name="mode" value="random"><span>Random</span>
                 </label>
             </div>
         </div>
 
-        <div class="divider"></div>
-
-        <!-- Apply + Undo buttons -->
-        <div class="btn-row">
+        <!-- Apply + Undo -->
+        <div class="actions">
             <button id="applyBtn">Apply</button>
-            <button id="undoBtn" disabled title="Undo the whole DelayerZ operation in one step">↩ Undo</button>
+            <button id="undoBtn" disabled title="Undo the whole DelayerZ operation in one step">Undo</button>
         </div>
 
-        <!-- Status -->
-        <div id="status" class="status"></div>
+        <!-- Footer: version + log button -->
+        <div class="footer">
+            <span>v1.4.1</span>
+            <button id="logBtn" type="button" title="Show log" aria-pressed="false" aria-controls="log">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+                    stroke-width="1.2" stroke-linecap="square" aria-hidden="true">
+                    <path d="M1.5 2.5h9M1.5 6h9M1.5 9.5h6" />
+                </svg>
+            </button>
+        </div>
 
-        <!-- Hint -->
-        <p class="hint">Zeus 2026<br></p>
+        <!-- Log (hidden until the log button opens it), under the footer -->
+        <div id="log" class="log" hidden>
+            <div class="log-empty">No messages yet.</div>
+        </div>
 
     </div>
 
