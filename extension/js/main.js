@@ -118,7 +118,8 @@
     delayInput.addEventListener("blur", clampDelay);
 
     // ============================================================
-    // Tabs: Delay | Movement. The last tab used opens next time.
+    // Tools: Delay | Movement, picked from the icon rail on the left.
+    // The last tool used opens next time.
     // ============================================================
     var TAB_KEY = "delayerz.tab";
     var tabs = {
@@ -285,7 +286,7 @@
     };
     var step = "create";
 
-    // A waiting Continue or Finish also shows as a dot on the Movement tab
+    // A waiting Continue or Finish also shows as a dot on the Movement icon (while Delay is open)
     function setStep(name) {
         step = name;
         movementBtn.textContent = STEPS[name].label;
@@ -343,10 +344,7 @@
     }
 
     // --- Log: hidden by default, opened with the log button ---
-    // Newest entry first, last 20 kept. While the log is closed, a dot on
-    // the button shows that a message arrived (red wins over green, green over blue).
-    var UNREAD_RANK = { info: 0, success: 1, error: 2 };
-
+    // Newest entry first, last 20 kept. No new-message marker on the button.
     logBtn.addEventListener("click", function () {
         setLogOpen(logEl.hidden);
     });
@@ -355,7 +353,6 @@
         logEl.hidden = !open;
         logBtn.setAttribute("aria-pressed", open ? "true" : "false");
         logBtn.title = open ? "Hide log" : "Show log";
-        if (open) logBtn.removeAttribute("data-unread");
     }
 
     function addLog(msg, type) {
@@ -373,13 +370,6 @@
         logEl.insertBefore(row, logEl.firstChild);
 
         while (logEl.children.length > LOG_MAX) logEl.removeChild(logEl.lastChild);
-
-        if (logEl.hidden) {
-            var current = logBtn.getAttribute("data-unread");
-            if (!current || UNREAD_RANK[type] >= UNREAD_RANK[current]) {
-                logBtn.setAttribute("data-unread", type);
-            }
-        }
     }
 
     function clockTime(d) {

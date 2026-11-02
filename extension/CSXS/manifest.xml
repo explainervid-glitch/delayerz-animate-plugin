@@ -6,14 +6,14 @@
     </ExtensionList>
     <ExecutionEnvironment>
         <HostList>
-            <!-- FLPR = Adobe Animate | [24.0,99.9] = Animate 2024 and newer -->
-            <Host Name="FLPR" Version="[24.0,99.9]" />
+            <!-- FLPR = Adobe Animate | [21.0,99.9] = Animate 2021 and newer -->
+            <Host Name="FLPR" Version="[21.0,99.9]" />
         </HostList>
         <LocaleList>
             <Locale Code="All" />
         </LocaleList>
         <RequiredRuntimeList>
-            <!-- CSXS 9+ is required for Animate 2024 -->
+            <!-- CSXS 9+ covers Animate 2021 and newer -->
             <RequiredRuntime Name="CSXS" Version="9.0" />
         </RequiredRuntimeList>
     </ExecutionEnvironment>
@@ -32,7 +32,7 @@
                     <Menu>DelayerZ</Menu>
                     <Geometry>
                         <Size>
-                            <Height>270</Height>
+                            <Height>250</Height>
                             <Width>200</Width>
                         </Size>
                     </Geometry>

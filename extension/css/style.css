@@ -61,19 +61,24 @@ body {
     user-select: none;
 }
 
-/* ---- Layout ---- */
+/* ---- Layout: tool rail on the left, the open tool on the right ---- */
+.shell {
+    height: 100%;
+    display: flex;
+}
+
 .panel {
+    flex: 1;
+    min-width: 0;
     height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 10px;
+    padding: 10px 8px;
 }
 
 .field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
 }
 
 .field-label {
@@ -82,59 +87,64 @@ body {
     color: var(--text);
 }
 
-/* ---- Tabs: Delay | Movement, flush with the panel top ---- */
-.tabs {
+/* ---- Tool rail: a column of tool icons, like Animate's own toolbars ---- */
+.tool-rail {
+    width: 32px;
+    flex-shrink: 0;
     display: flex;
-    margin: -10px -10px 0;
-    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    align-items: center;
+    padding-top: 8px;
+    border-right: 1px solid var(--border);
 }
 
-.tab {
+.tool-btn {
     position: relative;
-    flex: 1;
-    padding: 7px 0 6px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border: 0;
+    border-radius: var(--radius);
     background: transparent;
     color: var(--muted);
-    font: inherit;
-    font-size: 11px;
-    font-weight: 600;
     cursor: pointer;
 }
 
-.tab:hover {
+.tool-btn:hover {
     color: var(--text);
+    background: var(--surface-hover);
 }
 
-/* No focus ring after a click; the underline already shows the open tab */
-.tab:focus {
+/* No focus ring after a click; the blue square already shows the open tool */
+.tool-btn:focus {
     outline: none;
 }
 
-.tab[aria-selected="true"] {
-    color: var(--text);
-    box-shadow: inset 0 -2px 0 var(--accent);
+.tool-btn[aria-selected="true"] {
+    background: var(--accent);
+    color: #fff;
 }
 
-/* Movement waits for Continue or Finish while the Delay tab is open */
-.tab[data-step]::after {
+/* Movement waits for Continue or Finish while the Delay tool is open */
+.tool-btn[data-step][aria-selected="false"]::after {
     content: "";
     position: absolute;
-    top: 6px;
-    margin-left: 4px;
-    width: 6px;
-    height: 6px;
+    top: 2px;
+    right: 2px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
 }
 
-.tab[data-step="continue"]::after { background: var(--warning); }
-.tab[data-step="finish"]::after   { background: var(--done); }
+.tool-btn[data-step="continue"]::after { background: var(--warning); }
+.tool-btn[data-step="finish"]::after   { background: var(--done); }
 
 /* One tab's controls, spaced like the panel itself */
 .tab-panel {
     display: flex;
     flex-direction: column;
-    gap: 10px;
 }
 
 .tab-panel[hidden] {
@@ -211,7 +221,6 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 2px;
     cursor: ew-resize;
 }
 
@@ -302,7 +311,6 @@ body.scrubbing * {
 /* ---- Buttons ---- */
 .actions {
     display: flex;
-    gap: 6px;
 }
 
 .actions button {
@@ -366,7 +374,6 @@ body.scrubbing * {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    margin-top: -4px;
     font-size: 10px;
     color: var(--muted);
 }
@@ -377,7 +384,6 @@ body.scrubbing * {
     height: 20px;
     display: flex;
     align-items: center;
-    gap: 5px;
     padding: 0 4px;
     background: transparent;
     border: 1px solid transparent;
@@ -402,27 +408,11 @@ body.scrubbing * {
     border-color: var(--border);
 }
 
-/* Unread marker: a new message arrived while the log was closed */
-#logBtn[data-unread]::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-}
-
-#logBtn[data-unread="success"]::after { background: var(--success); }
-#logBtn[data-unread="error"]::after   { background: var(--error); }
-#logBtn[data-unread="info"]::after    { background: var(--info); }
-
 /* ---- Log: under the footer, fills the rest of the panel; newest entry first ---- */
 .log {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    margin-top: -4px;
     padding-top: 6px;
     border-top: 1px solid var(--border);
     font-size: 11px;
@@ -434,7 +424,6 @@ body.scrubbing * {
 
 .log-entry {
     display: flex;
-    gap: 6px;
     padding: 2px 0;
     word-break: break-word;
 }
@@ -456,7 +445,6 @@ body.scrubbing * {
 /* ---- Movement: "Target: ANGRY 02" over the length field + Pick button ---- */
 .row {
     display: flex;
-    gap: 4px;
 }
 
 .row .stepper {
@@ -506,3 +494,19 @@ body.scrubbing * {
     opacity: 0.4;
     cursor: default;
 }
+
+/* ---- Spacing between children ----
+   Margins instead of flex gap: the panel browser in Animate 2021-2022 is too
+   old for gap in flex layouts (needs Chromium 84). ---- */
+.panel > * + *      { margin-top: 10px; }
+.panel > .tab-panel + .tab-panel { margin-top: 0; } /* only one tool shows at a time */
+.panel > .footer,
+.panel > .log       { margin-top: 6px; }
+.tab-panel > * + *  { margin-top: 10px; }
+.field > * + *      { margin-top: 4px; }
+.tool-rail > * + *  { margin-top: 4px; }
+.actions > * + *    { margin-left: 6px; }
+.row > * + *        { margin-left: 4px; }
+.stepper-value > * + * { margin-left: 2px; }
+#logBtn > * + *     { margin-left: 5px; }
+.log-entry > * + *  { margin-left: 6px; }

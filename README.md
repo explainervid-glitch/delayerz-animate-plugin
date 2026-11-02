@@ -3,8 +3,8 @@
 Stagger animations across layers in Adobe Animate with one click.
 
 - **Version:** 1.6.0
-- **Host:** Adobe Animate 2024 or newer (Windows)
-- **Ships as:** a dockable CEP panel (Delay and Movement tabs) and a Commands menu script
+- **Host:** Adobe Animate 2021 or newer (Windows)
+- **Ships as:** a dockable CEP panel (Delay and Movement tools) and a Commands menu script
 
 ## About
 
@@ -58,14 +58,14 @@ https://github.com/user-attachments/assets/c65d4140-fff8-4dfc-bdbb-df289a4a35e7
 
 ### Delay
 
-On the **Delay** tab of the panel:
+Open **Delay** from the icon rail on the left of the panel (staggered bars):
 
 1. In the timeline, select the starting keyframe on 2 or more layers (drag across the layers, or click the layer headers).
 2. Set **Delay (frames)**, the frames between each layer: drag the number left or right, click it to type, or use **−** / **+**.
 3. Choose **Start from**: Bottom, Top, or Random.
 4. Click **Apply**.
 
-Messages (done, or why it could not run) go to the log. Open it with the list icon next to the version, at the bottom of the panel. While the log is closed, a dot on the icon shows a new message: green for success, red for an error.
+Messages (done, or why it could not run) go to the log. Open it with the version button (`v1.6.0` and a list icon) at the bottom of the panel.
 
 Notes:
 
@@ -75,7 +75,7 @@ Notes:
 
 ### Movement
 
-The **Movement** tab of the panel changes a character from one movement (Graphic symbol) to another, with a transition copy you re-pose by hand.
+**Movement** (walking figure in the icon rail) changes a character from one movement (Graphic symbol) to another, with a transition copy you re-pose by hand.
 
 1. Select the new movement symbol (on stage or in the Library) and click the pipette. It shows as **Target**.
 2. Set the transition length in frames (drag the number, or click it to type).
@@ -90,7 +90,7 @@ Notes:
 - Keyframes between the start of the transition and the playhead stop it; keyframes on those two frames are fine.
 - Undoing step 1 (Ctrl+Z) turns the button back to **Change Movement**.
 - Continue only works in the timeline where Change Movement ran.
-- While Continue or Finish is waiting, a red or green dot shows on the Movement tab.
+- While Continue or Finish is waiting and Delay is open, a red or green dot shows on the Movement icon.
 
 ## Usage reporting
 
@@ -126,8 +126,8 @@ project folder under **Add package** in zeploy.
 ```
 proj_DelayerZ/
   extension/              CEP extension (installed as "DelayerZ")
-    CSXS/manifest.xml     Extension manifest (host FLPR, Animate 2024+)
-    DelayerZ.html         Panel UI (Delay and Movement tabs)
+    CSXS/manifest.xml     Extension manifest (host FLPR, Animate 2021+)
+    DelayerZ.html         Panel UI (icon rail: Delay and Movement)
     css/style.css         Panel styles
     fonts/                IBM Plex Sans 400 + 600 (bundled, OFL.txt licence)
     js/main.js            Panel logic, talks to the JSX bridge

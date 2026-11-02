@@ -280,7 +280,7 @@ if ($allOk) {
     Write-Host "  ==================================================" -ForegroundColor DarkCyan
     Write-Host ""
     Write-Host "  Next steps:" -ForegroundColor White
-    Write-Host "  1. Open Adobe Animate (2024 or newer)"        -ForegroundColor Gray
+    Write-Host "  1. Open Adobe Animate (2021 or newer)"        -ForegroundColor Gray
     Write-Host "  2. Panel   : Window > Extensions > DelayerZ"  -ForegroundColor Gray
     if ($jsflFound) {
         Write-Host "  3. Command : Commands > DelayerZ"          -ForegroundColor Gray
