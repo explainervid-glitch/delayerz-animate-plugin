@@ -109,7 +109,7 @@ function zeployUsageV1(plugin, version) {
     // dialog is cancelled or the selection is wrong). Same id as the panel,
     // so both count as DelayerZ. Keep the version in step with
     // CSXS/manifest.xml (npm run package checks it).
-    var usage = zeployUsageV1("com.zeus.delayerz", "1.6.0");
+    var usage = zeployUsageV1("com.zeus.delayerz", "1.7.0");
     var usageStart; // set once the dialog is accepted, so it times the work only
 
     // --- HELPER: Array.indexOf replacement (not available in ES3) ---
