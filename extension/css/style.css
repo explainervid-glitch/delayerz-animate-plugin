@@ -442,14 +442,20 @@ body.scrubbing * {
     color: var(--muted);
 }
 
-/* ---- Movement: "Target: ANGRY 02" over the length field + Pick button ---- */
+/* ---- Movement: [Target: ANGRY 02][pick], then [30 f], then [Change Movement] ---- */
 .row {
     display: flex;
 }
 
-.row .stepper {
+.target-cell {
     flex: 1;
     min-width: 0;
+    height: var(--control-h);
+    line-height: calc(var(--control-h) - 2px);
+    padding: 0 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
 }
 
 .target-label {

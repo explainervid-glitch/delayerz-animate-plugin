@@ -678,8 +678,9 @@ function tfRemoveGhostLayers(tl) {
 }
 
 // --- HELPER: P of the transition under a ghost layer, or -1 ---
-// The ghost sits on End - 1, directly above the copy layer; the copy's
-// keyframe span holding that frame starts at P.
+// The ghost sits on End - 1, directly above the copy layer. P is the first
+// keyframe of the copy's run there (in a tween the copy has keyframes at P
+// and End - 1).
 function tfGhostTransitionStart(tl) {
     for (var i = 0; i < tl.layerCount - 1; i++) {
         var g = tl.layers[i];
@@ -687,11 +688,20 @@ function tfGhostTransitionStart(tl) {
         for (var f = 0; f < g.frameCount; f++) {
             if (g.frames[f].startFrame !== f || !g.frames[f].elements.length) continue;
             var copy = tl.layers[i + 1];
-            if (f < copy.frameCount && copy.frames[f].elements.length) return copy.frames[f].startFrame;
-            return -1;
+            if (f >= copy.frameCount || !copy.frames[f].elements.length) return -1;
+            var start = copy.frames[f].startFrame;
+            var name = tfItemNameAt(copy, start);
+            while (start > 0 && name && tfItemNameAt(copy, start - 1) === name) start = copy.frames[start - 1].startFrame;
+            return start;
         }
     }
     return -1;
+}
+
+// --- HELPER: library name of the one instance at frame f of a layer, or "" ---
+function tfItemNameAt(layer, f) {
+    var els = layer.frames[f].elements;
+    return els.length === 1 && els[0].libraryItem ? els[0].libraryItem.name : "";
 }
 
 // --- HELPER: guide layer above layer li with character2 on frame f, faded ---
@@ -881,15 +891,24 @@ function tfCreateTransition(targetName, length, copyLoop) {
         var endSpan = layer.frames[End];
         var spanStop = endSpan.startFrame + endSpan.duration; // first frame after character1's span at End
 
+        // --- Tween mode: character1 moves in a classic tween through P (or into P) ---
+        // The copy then stays on character1's layer, so the tween keeps running
+        // with the copy: keyframes at P and End - 1 (both take the copy) cut it
+        // where the transition starts and ends. Distributing the copy would
+        // leave a blank keyframe at P and break the tween before it.
+        var tweenMode = span.tweenType === "motion" || (P > 0 && layer.frames[P - 1].tweenType === "motion");
+        var lastCopy = End - 1; // last frame of the copy
+
         // --- 1. Keyframe at End (skipped when keyed), swap to character2 from its frame 1 ---
         tfUseLayer(tl, li);
         if (!endKeyed) tl.insertKeyframe(End);
         tfSwap(tl.layers[li].frames[End].elements[loc.index], target, 0, "loop");
 
-        // --- 2. Keyframe at P (skipped when keyed) ---
+        // --- 2. Keyframe at P (skipped when keyed); in a tween also at End - 1 ---
         if (span.startFrame !== P) {
             tl.insertKeyframe(P);
         }
+        if (tweenMode && lastCopy > P) tl.insertKeyframe(lastCopy);
 
         // --- 3. Duplicate the symbol and swap the instance at P ---
         var copyName = tfUniqueCopyName(lib, sourceName);
@@ -900,7 +919,9 @@ function tfCreateTransition(targetName, length, copyLoop) {
         if (dup.length !== 1) return "ERROR: Duplicate of \"" + sourceName + "\" not found in the library.";
         lib.selectItem(dup[0].name);
         if (!lib.renameItem(copyName)) return "ERROR: Could not rename \"" + dup[0].name + "\" to \"" + copyName + "\".";
-        tfSwap(tl.layers[li].frames[P].elements[pIndex], tfFindItem(lib, copyPath), innerAtP, copyLoop);
+        var copyItem = tfFindItem(lib, copyPath);
+        tfSwap(tl.layers[li].frames[P].elements[pIndex], copyItem, innerAtP, copyLoop);
+        if (tweenMode && lastCopy > P) tfSwap(tl.layers[li].frames[lastCopy].elements[pIndex], copyItem, innerAtEnd, copyLoop);
 
         // --- 4. Distribute to Layers (Ctrl+Shift+D): character2 first, then the copy ---
         // Each new layer goes right below character1's layer, so distributing
@@ -909,9 +930,16 @@ function tfCreateTransition(targetName, length, copyLoop) {
         tfSelectElement(dom, tl, li, End, loc.index);
         var targetLi = tfDistribute(dom, tl, tfShortName(targetName));
 
-        tfSelectElement(dom, tl, li, P, pIndex);
-        var copyLi = tfDistribute(dom, tl, copyName);
-        if (copyLi <= targetLi) targetLi++;
+        var copyLi = li;
+        if (tweenMode) {
+            // The copy's tween stops at End - 1; End is blank, so no tween runs into it
+            tl.layers[li].frames[lastCopy].tweenType = "none";
+            tl.layers[li].frames[End].tweenType = "none";
+        } else {
+            tfSelectElement(dom, tl, li, P, pIndex);
+            copyLi = tfDistribute(dom, tl, copyName);
+            if (copyLi <= targetLi) targetLi++;
+        }
         // character2 stops where character1's span stopped, before any later keyframe of character1
         if (spanStop < tl.layers[targetLi].frameCount && !tfIsKeyframe(tl.layers[targetLi], spanStop)) {
             tfUseLayer(tl, targetLi);
@@ -919,7 +947,7 @@ function tfCreateTransition(targetName, length, copyLoop) {
         }
 
         // character1's layer: one blank span from P (End's extra blank keyframe goes)
-        if (tfIsKeyframe(tl.layers[li], End) && tl.layers[li].frames[End].elements.length === 0) {
+        if (!tweenMode && tfIsKeyframe(tl.layers[li], End) && tl.layers[li].frames[End].elements.length === 0) {
             tfUseLayer(tl, li);
             tl.clearKeyframes(End, End + 1);
         }
@@ -947,7 +975,8 @@ function tfCreateTransition(targetName, length, copyLoop) {
         tfSavePending(dom, [tl.name, copyPath, targetName, End, innerAtEnd, blankAfter ? 1 : 0]);
         delayerzUsage.action("movement", new Date().getTime() - usageStart);
 
-        return "OK: Step 1 of 2. Layer " + copyName + ": frames " + (P + 1) + "-" + End + " (" + copyLoop + ", from inner frame " + (innerAtP + 1) +
+        var copyWhere = tweenMode ? "Copy " + copyName + " in the tween on layer " + tl.layers[copyLi].name : "Layer " + copyName;
+        return "OK: Step 1 of 2. " + copyWhere + ": frames " + (P + 1) + "-" + End + " (" + copyLoop + ", from inner frame " + (innerAtP + 1) +
             "). Layer " + tfShortName(targetName) + ": from frame " + (End + 1) + ". Line up " + tfShortName(targetName) +
             " at frame " + (End + 1) + " with the copy (both shown as outlines): move it, and set its first frame in Properties > Looping if needed. Then click Continue.";
     } catch (e) {
@@ -986,9 +1015,11 @@ function tfClearPending(dom) {
 
 // --- HELPER: copy layer and character2 layer of the pending transition, or null ---
 // Found by what sits at End: the copy (held one extra frame) and character2's keyframe.
+// Other layers can hold character2 at End too (the animator's own layer of it),
+// so character2's layer is the nearest match below the copy, where step 1 put it.
 function tfFindPendingLayers(tl, pend) {
     var copyLi = -1;
-    var targetLi = -1;
+    var targets = [];
     for (var i = 0; i < tl.layerCount; i++) {
         var layer = tl.layers[i];
         if (pend.end >= layer.frameCount) continue;
@@ -996,9 +1027,13 @@ function tfFindPendingLayers(tl, pend) {
         if (els.length !== 1 || els[0].elementType !== "instance" || !els[0].libraryItem) continue;
         var name = els[0].libraryItem.name;
         if (name === pend.copyPath && copyLi === -1) copyLi = i;
-        else if (name === pend.targetName && targetLi === -1 && tfIsKeyframe(layer, pend.end)) targetLi = i;
+        else if (name === pend.targetName && tfIsKeyframe(layer, pend.end)) targets.push(i);
     }
-    if (copyLi === -1 || targetLi === -1) return null;
+    if (copyLi === -1 || !targets.length) return null;
+    var targetLi = targets[0];
+    for (var t = 0; t < targets.length; t++) {
+        if (targets[t] > copyLi) { targetLi = targets[t]; break; }
+    }
     return { copy: copyLi, target: targetLi };
 }
 
