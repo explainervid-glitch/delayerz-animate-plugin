@@ -6,6 +6,7 @@
 // v1.7 - Revert v1.6: multi-layer setSelectedFrames caused cutFrames to cut all layers at once
 // Panel 1.6.0 - Change Movement (tf* functions at the end of this file)
 // Panel 1.7.0 - Animate 2021 and newer
+// Panel 1.7.1 - Change Movement keeps the copy in a classic tween; ghost follows the lined-up character2
 // ============================================================
 
 // ---- zeploy usage helper (begin): an unchanged copy of examples/usage/zeploy-usage.jsfl
@@ -114,7 +115,7 @@ var _lastOp = null;
 // "movement" per Change Movement (step 1), and an error when one fails unexpectedly. Validation messages ("select at
 // least 2 layers") are not counted. Keep the version in step with
 // CSXS/manifest.xml (npm run package checks it).
-var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.7.0");
+var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.7.1");
 
 // --- HELPER: Array.indexOf replacement (not available in ES3) ---
 function arrContains(arr, val) {

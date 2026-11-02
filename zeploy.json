@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "delayerz",
   "name": "DelayerZ",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Layer stagger (frame delay) tool for Adobe Animate: CEP panel plus a Commands menu script.",
   "components": [
     { "type": "cep", "source": "extension", "installName": "DelayerZ" },
