@@ -2,9 +2,9 @@
 
 Stagger animations across layers in Adobe Animate with one click.
 
-- **Version:** 1.5.0
+- **Version:** 1.6.0
 - **Host:** Adobe Animate 2024 or newer (Windows)
-- **Ships as:** a dockable CEP panel and a Commands menu script
+- **Ships as:** a dockable CEP panel (Delay and Movement tabs) and a Commands menu script
 
 ## About
 
@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/c65d4140-fff8-4dfc-bdbb-df289a4a35e7
 
 ## Installation
 
-1. Unzip `DelayerZ-v1.5.0.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
+1. Unzip `DelayerZ-v1.6.0.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
 2. Double click `install.bat` and accept the administrator prompt.
 3. If Animate is open, the installer asks whether to close it.
 4. Start Animate and open **Window > Extensions > DelayerZ**.
@@ -55,6 +55,10 @@ https://github.com/user-attachments/assets/c65d4140-fff8-4dfc-bdbb-df289a4a35e7
 - Sets `PlayerDebugMode = 1` under `HKCU\Software\Adobe\CSXS.9` to `CSXS.13`, which Animate needs to load unsigned panels.
 
 ## Usage
+
+### Delay
+
+On the **Delay** tab of the panel:
 
 1. In the timeline, select the starting keyframe on 2 or more layers (drag across the layers, or click the layer headers).
 2. Set **Delay (frames)**, the frames between each layer: drag the number left or right, click it to type, or use **−** / **+**.
@@ -69,13 +73,33 @@ Notes:
 - The panel Undo works once per Apply, in the document and timeline where Apply ran. It refuses to run if layers were added, removed or moved after Apply, to protect your timeline.
 - When the animation starts after frame 1, empty keyframes left by the move are cleared automatically.
 
+### Movement
+
+The **Movement** tab of the panel changes a character from one movement (Graphic symbol) to another, with a transition copy you re-pose by hand.
+
+1. Select the new movement symbol (on stage or in the Library) and click the pipette. It shows as **Target**.
+2. Set the transition length in frames (drag the number, or click it to type).
+3. Put the playhead where the new movement should start, select the current movement instance there, and click **Change Movement**.
+   - The current movement is duplicated as `<name>_COPY` and fills the frames before the playhead, on its own layer. The new movement starts at the playhead, on a layer below it.
+   - Both layers show as outlines and the copy layer is locked. Move the new movement, and set its first frame in **Properties > Looping** if needed, until it lines up with the copy.
+4. Click **Continue** (red). A red ghost of the new movement appears one frame before it starts, and the copy opens on that frame. Re-pose the copy to match the ghost.
+5. Click **Finish** (green). The panel leaves the copy, deletes the ghost, puts the playhead on the first frame of the transition and clears the Target.
+
+Notes:
+
+- Keyframes between the start of the transition and the playhead stop it; keyframes on those two frames are fine.
+- Undoing step 1 (Ctrl+Z) turns the button back to **Change Movement**.
+- Continue only works in the timeline where Change Movement ran.
+- While Continue or Finish is waiting, a red or green dot shows on the Movement tab.
+
 ## Usage reporting
 
 DelayerZ counts how often it is used, for the team's zeploy dashboard. Each
 time a stagger is applied from the panel ("apply"), undone from the panel
-("undo"), or applied from the Commands menu ("command"), it appends one line
+("undo"), or applied from the Commands menu ("command"), or a Change Movement is started
+("movement"), it appends one line
 to `%LOCALAPPDATA%\zeploy\usage\com.zeus.delayerz.jsonl`; an unexpected
-error in apply or undo is counted as an error. The zeploy agent sends daily
+error in apply, undo or a Change Movement step is counted as an error. The zeploy agent sends daily
 totals to the admin app and deletes the file.
 
 - Only the plugin id, version, the event name and how long it took are
@@ -103,12 +127,12 @@ project folder under **Add package** in zeploy.
 proj_DelayerZ/
   extension/              CEP extension (installed as "DelayerZ")
     CSXS/manifest.xml     Extension manifest (host FLPR, Animate 2024+)
-    DelayerZ.html         Panel UI
+    DelayerZ.html         Panel UI (Delay and Movement tabs)
     css/style.css         Panel styles
     fonts/                IBM Plex Sans 400 + 600 (bundled, OFL.txt licence)
     js/main.js            Panel logic, talks to the JSX bridge
     js/CSInterface.js     Adobe CEP library
-    jsx/DelayerZ.jsx      Stagger and undo logic (runs inside Animate)
+    jsx/DelayerZ.jsx      Stagger, undo and Change Movement logic (runs inside Animate)
     jsfl/DelayerZ.jsfl    Stand-alone Commands menu version
   installer/
     install.bat           Launcher

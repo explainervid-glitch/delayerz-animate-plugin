@@ -38,6 +38,10 @@
     --success: #5cc489;
     --error: #ef6b6b;
     --info: #7ab8dd;
+    --warning: #d23f3f;
+    --warning-hover: #df5353;
+    --done: #2f9e60;
+    --done-hover: #38b06c;
     --radius: 2px;
     --control-h: 26px;
 }
@@ -76,6 +80,65 @@ body {
     font-size: 11px;
     font-weight: 600;
     color: var(--text);
+}
+
+/* ---- Tabs: Delay | Movement, flush with the panel top ---- */
+.tabs {
+    display: flex;
+    margin: -10px -10px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.tab {
+    position: relative;
+    flex: 1;
+    padding: 7px 0 6px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.tab:hover {
+    color: var(--text);
+}
+
+/* No focus ring after a click; the underline already shows the open tab */
+.tab:focus {
+    outline: none;
+}
+
+.tab[aria-selected="true"] {
+    color: var(--text);
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* Movement waits for Continue or Finish while the Delay tab is open */
+.tab[data-step]::after {
+    content: "";
+    position: absolute;
+    top: 6px;
+    margin-left: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.tab[data-step="continue"]::after { background: var(--warning); }
+.tab[data-step="finish"]::after   { background: var(--done); }
+
+/* One tab's controls, spaced like the panel itself */
+.tab-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tab-panel[hidden] {
+    display: none;
 }
 
 /* ---- Delay stepper: [-] [ 5 ] [+]; drag the number left/right to change it ---- */
@@ -139,6 +202,44 @@ body {
 .stepper input::-webkit-inner-spin-button,
 .stepper input::-webkit-outer-spin-button {
     -webkit-appearance: none;
+}
+
+/* Movement length: [ 30 f ] in one cell, no -/+ buttons; drag or click to type */
+.stepper-value {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: ew-resize;
+}
+
+.stepper-value:hover:not(:focus-within),
+.stepper-value.scrubbing {
+    background: var(--surface-hover);
+}
+
+.stepper-value input {
+    flex: 0 0 auto;
+    width: 3.5ch;
+    border: 0;
+    text-align: right;
+}
+
+.stepper-value input:hover:not(:focus),
+.stepper-value input.scrubbing {
+    background: transparent;
+}
+
+.stepper-value:focus-within:not(.scrubbing),
+.stepper-value:focus-within:not(.scrubbing) input {
+    cursor: text;
+}
+
+.stepper .unit {
+    color: var(--muted);
+    font-size: 11px;
 }
 
 /* While dragging, keep the resize cursor everywhere */
@@ -208,10 +309,12 @@ body.scrubbing * {
     height: 28px;
     border-radius: var(--radius);
     font: inherit;
+    white-space: nowrap;
     cursor: pointer;
 }
 
-#applyBtn {
+#applyBtn,
+#movementBtn {
     flex: 1;
     border: 0;
     background: var(--accent);
@@ -219,8 +322,27 @@ body.scrubbing * {
     font-weight: 600;
 }
 
-#applyBtn:hover:not(:disabled) {
+#applyBtn:hover:not(:disabled),
+#movementBtn:hover:not(:disabled) {
     background: var(--accent-hover);
+}
+
+/* Continue: step 2 is waiting, warning red */
+#movementBtn.continue {
+    background: var(--warning);
+}
+
+#movementBtn.continue:hover:not(:disabled) {
+    background: var(--warning-hover);
+}
+
+/* Finish: re-pose done, last click; green */
+#movementBtn.finish {
+    background: var(--done);
+}
+
+#movementBtn.finish:hover:not(:disabled) {
+    background: var(--done-hover);
 }
 
 #undoBtn {
@@ -243,24 +365,30 @@ body.scrubbing * {
 .footer {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     margin-top: -4px;
     font-size: 10px;
     color: var(--muted);
 }
 
+/* Version and log icon in one button: "v1.6.0 ≡" */
 #logBtn {
     position: relative;
-    width: 20px;
     height: 20px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 5px;
+    padding: 0 4px;
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--radius);
     color: var(--muted);
+    font: inherit;
     cursor: pointer;
+}
+
+#logBtn:focus {
+    outline: none;
 }
 
 #logBtn:hover {
@@ -323,4 +451,58 @@ body.scrubbing * {
 
 .log-empty {
     color: var(--muted);
+}
+
+/* ---- Movement: "Target: ANGRY 02" over the length field + Pick button ---- */
+.row {
+    display: flex;
+    gap: 4px;
+}
+
+.row .stepper {
+    flex: 1;
+    min-width: 0;
+}
+
+.target-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#target {
+    color: var(--info);
+}
+
+#target.target-none {
+    color: var(--muted);
+    font-weight: 400;
+}
+
+.pick-btn {
+    width: var(--control-h);
+    height: var(--control-h);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.pick-btn:focus {
+    outline: none;
+}
+
+.pick-btn:hover:not(:disabled) {
+    background: var(--surface-hover);
+}
+
+.pick-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
 }

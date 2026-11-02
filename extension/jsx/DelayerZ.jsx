@@ -4,6 +4,7 @@
 // v1.5 - Fix: clear stage selection before cut/paste to prevent blank layer bug
 // v1.6 - Fix: normalize frame selection to animStartFrame before cut/paste loop
 // v1.7 - Revert v1.6: multi-layer setSelectedFrames caused cutFrames to cut all layers at once
+// Panel 1.6.0 - Change Movement (tf* functions at the end of this file)
 // ============================================================
 
 // ---- zeploy usage helper (begin): an unchanged copy of examples/usage/zeploy-usage.jsfl
@@ -108,11 +109,11 @@ function zeployUsageV1(plugin, version) {
 // --- Undo state (saved after a successful apply) ---
 var _lastOp = null;
 
-// --- Usage for zeploy: one "apply" or "undo" per completed operation, and
-// an error when one fails unexpectedly. Validation messages ("select at
+// --- Usage for zeploy: one "apply" or "undo" per completed operation, one
+// "movement" per Change Movement (step 1), and an error when one fails unexpectedly. Validation messages ("select at
 // least 2 layers") are not counted. Keep the version in step with
 // CSXS/manifest.xml (npm run package checks it).
-var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.5.0");
+var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.6.0");
 
 // --- HELPER: Array.indexOf replacement (not available in ES3) ---
 function arrContains(arr, val) {
@@ -528,4 +529,646 @@ function undoDelayerZ() {
  */
 function canUndoDelayerZ() {
     return _lastOp ? "1" : "0";
+}
+
+// ============================================================
+// Change Movement (from the Temp Feature prototype)
+// Character1 to character2 at the playhead, with a transition copy over the
+// N frames before it. One panel button runs the three steps:
+//
+// tfPickSymbol()                         selected symbol for the Target
+// tfCreateTransition(target, n, loop)    step 1: copy, swaps, layers; line-up view
+// tfContinueTransition()                 step 2: ghost, enter the copy for the re-pose
+// tfFinishTransition()                   step 3: leave the copy, delete the ghost
+// tfClearGhost()                         delete the TF_GHOST guide layer(s)
+// tfHasGhost()                           "1" when a ghost layer exists
+// tfPanelState()                         ghost flag + pending step 2 flag, e.g. "01"
+//
+// Frame numbers are 0-based in JSFL and 1-based in every message.
+// ============================================================
+
+// --- HELPER: last part of a library path ("Movements/run" -> "run") ---
+function tfShortName(path) {
+    var parts = String(path).split("/");
+    return parts[parts.length - 1];
+}
+
+// --- HELPER: folder part of a library path ("Movements/run" -> "Movements/") ---
+function tfFolderOf(path) {
+    var i = String(path).lastIndexOf("/");
+    return i === -1 ? "" : path.substring(0, i + 1);
+}
+
+// --- HELPER: library item by full path, or null ---
+function tfFindItem(lib, path) {
+    var items = lib.items;
+    for (var i = 0; i < items.length; i++) {
+        if (items[i].name === path) return items[i];
+    }
+    return null;
+}
+
+// --- HELPER: is frame f a keyframe on this layer ---
+function tfIsKeyframe(layer, f) {
+    return f < layer.frameCount && layer.frames[f].startFrame === f;
+}
+
+// --- HELPER: same element, found again by symbol and position ---
+// JSFL hands out new wrapper objects, so === between two reads is unreliable.
+function tfSameElement(a, b) {
+    return a.elementType === b.elementType &&
+        a.libraryItem && b.libraryItem &&
+        a.libraryItem.name === b.libraryItem.name &&
+        Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01;
+}
+
+// --- HELPER: layer index and element index of the selected element at frame f ---
+function tfLocate(tl, el, f) {
+    // Element.layer exists in recent Animate versions; check it first.
+    var preferred = -1;
+    try {
+        for (var p = 0; p < tl.layerCount; p++) {
+            if (el.layer && tl.layers[p].name === el.layer.name) { preferred = p; break; }
+        }
+    } catch (e) { }
+
+    var order = [];
+    if (preferred !== -1) order.push(preferred);
+    for (var li = 0; li < tl.layerCount; li++) if (li !== preferred) order.push(li);
+
+    for (var o = 0; o < order.length; o++) {
+        var layer = tl.layers[order[o]];
+        if (f >= layer.frameCount) continue;
+        var els = layer.frames[f].elements;
+        for (var k = 0; k < els.length; k++) {
+            if (tfSameElement(els[k], el)) return { layer: order[o], index: k };
+        }
+    }
+    return null;
+}
+
+// --- HELPER: inner frame a graphic instance shows, `offset` frames after its keyframe ---
+// Unverified for "lastFrame" ranges: the loop is taken over the whole symbol.
+function tfInnerFrame(firstFrame, loop, offset, length) {
+    if (length < 1) return 0;
+    switch (loop) {
+        case "single frame":
+            return firstFrame;
+        case "play once":
+            return Math.min(firstFrame + offset, length - 1);
+        case "play once reverse":
+            return Math.max(firstFrame - offset, 0);
+        case "loop reverse":
+            return (((firstFrame - offset) % length) + length) % length;
+        default: // "loop"
+            return (firstFrame + offset) % length;
+    }
+}
+
+// --- HELPER: unique "<name>_COPY", "<name>_COPY2", ... inside the same folder ---
+function tfUniqueCopyName(lib, path) {
+    var folder = tfFolderOf(path);
+    var base = tfShortName(path) + "_COPY";
+    var name = base;
+    var n = 2;
+    while (lib.itemExists(folder + name)) {
+        name = base + n;
+        n++;
+    }
+    return name;
+}
+
+// --- HELPER: make layer idx current, so frame commands act on it alone ---
+function tfUseLayer(tl, idx) {
+    tl.setSelectedLayers(idx, true);
+    tl.currentLayer = idx;
+}
+
+// --- HELPER: Distribute to Layers on the selected element, return the new layer ---
+// Animate adds the layer right below the current one, named after the symbol,
+// and leaves a blank keyframe where the element was.
+function tfDistribute(dom, tl, layerName) {
+    var before = tl.currentLayer;
+    dom.distributeToLayers();
+    if (tl.layers[tl.currentLayer].name === layerName) return tl.currentLayer;
+    for (var i = before + 1; i < tl.layerCount; i++) {
+        if (tl.layers[i].name === layerName) return i;
+    }
+    return before + 1;
+}
+
+// --- Ghost: character2's first pose on a guide layer, shown while re-posing ---
+var TF_GHOST_NAME = "TF_GHOST";
+var TF_GHOST_ALPHA = 30;
+var TF_GHOST_RED = 0xFF0000;
+var TF_GHOST_TINT = 50;
+
+// --- HELPER: delete every ghost layer of a timeline, return how many ---
+function tfRemoveGhostLayers(tl) {
+    var removed = 0;
+    for (var i = tl.layerCount - 1; i >= 0; i--) {
+        if (tl.layers[i].name === TF_GHOST_NAME && tl.layers[i].layerType === "guide") {
+            tl.layers[i].locked = false;
+            tl.deleteLayer(i);
+            removed++;
+        }
+    }
+    return removed;
+}
+
+// --- HELPER: P of the transition under a ghost layer, or -1 ---
+// The ghost sits on End - 1, directly above the copy layer; the copy's
+// keyframe span holding that frame starts at P.
+function tfGhostTransitionStart(tl) {
+    for (var i = 0; i < tl.layerCount - 1; i++) {
+        var g = tl.layers[i];
+        if (g.name !== TF_GHOST_NAME || g.layerType !== "guide") continue;
+        for (var f = 0; f < g.frameCount; f++) {
+            if (g.frames[f].startFrame !== f || !g.frames[f].elements.length) continue;
+            var copy = tl.layers[i + 1];
+            if (f < copy.frameCount && copy.frames[f].elements.length) return copy.frames[f].startFrame;
+            return -1;
+        }
+    }
+    return -1;
+}
+
+// --- HELPER: guide layer above layer li with character2 on frame f, faded ---
+// Copies the matrix and first frame of `source` (character2 at P + N, as the
+// animator lined it up), so the ghost shows exactly where and how character2
+// starts. Returns the ghost layer index.
+function tfAddGhost(dom, tl, li, f, targetName, source) {
+    var sourceFirst = source.firstFrame;
+    tl.setSelectedLayers(li, true);
+    tl.currentLayer = li;
+    var g = tl.addNewLayer(TF_GHOST_NAME, "guide", true);
+    var ghost = tl.layers[g];
+
+    // One blank keyframe span holding only frame f (one call for f and f + 1)
+    if (ghost.frameCount <= f) tl.insertFrames(f - ghost.frameCount + 1, false, ghost.frameCount - 1);
+    tl.convertToBlankKeyframes(f, Math.min(f + 2, tl.layers[g].frameCount));
+
+    tl.currentLayer = g;
+    tl.currentFrame = f;
+    dom.selectNone();
+    dom.library.addItemToDocument({ x: source.x, y: source.y }, targetName);
+    var el = tl.layers[g].frames[f].elements[0];
+    el.matrix = source.matrix;
+    el.firstFrame = sourceFirst;
+    el.loop = "single frame";
+    // Faded red: Advanced color keeps the alpha and adds a 50% red tint.
+    // Set directly (no selection, ~0 ms); the selection route is a fallback
+    // in case Animate ignores the direct write.
+    tfTintRed(el);
+    if (tl.layers[g].frames[f].elements[0].colorMode !== "advanced") {
+        dom.selectNone();
+        dom.selection = [tl.layers[g].frames[f].elements[0]];
+        dom.setInstanceAlpha(TF_GHOST_ALPHA);
+        tfTintRed(dom.selection[0]);
+        if (dom.selection[0].colorMode !== "advanced") dom.setInstanceTint(TF_GHOST_RED, TF_GHOST_TINT);
+        dom.selectNone();
+    }
+
+    // Wireframe in red: outline view uses the layer color
+    tl.layers[g].color = "#FF0000";
+    tl.layers[g].outline = true;
+    tl.layers[g].locked = true;
+    return g;
+}
+
+// --- HELPER: Advanced color effect, alpha TF_GHOST_ALPHA plus a red tint ---
+function tfTintRed(el) {
+    var keep = (100 - TF_GHOST_TINT);
+    el.colorMode = "advanced";
+    el.colorAlphaPercent = TF_GHOST_ALPHA;
+    el.colorAlphaAmount = 0;
+    el.colorRedPercent = keep;
+    el.colorGreenPercent = keep;
+    el.colorBluePercent = keep;
+    el.colorRedAmount = Math.round(255 * TF_GHOST_TINT / 100);
+    el.colorGreenAmount = 0;
+    el.colorBlueAmount = 0;
+}
+
+// --- HELPER: select one element at frame f of layer li, return the selection ---
+// Moving the playhead redraws the stage (the slow part of a swap), so it
+// only moves when it has to.
+function tfSelectElement(dom, tl, li, f, index) {
+    if (tl.currentLayer !== li) tfUseLayer(tl, li);
+    if (tl.currentFrame !== f) tl.currentFrame = f;
+    dom.selectNone();
+    dom.selection = [tl.layers[li].frames[f].elements[index]];
+    return dom.selection;
+}
+
+// --- HELPER: swap an instance's symbol without selecting it ---
+// Same result as swapElement (transform kept), but no playhead move or selection.
+function tfSwap(el, item, firstFrame, loop) {
+    el.libraryItem = item;
+    el.firstFrame = firstFrame;
+    el.loop = loop;
+}
+
+/**
+ * Library path of the selected Graphic symbol: one instance on stage first,
+ * otherwise one item selected in the Library panel.
+ * @returns {string} - "OK: <path>" or "ERROR: ..."
+ */
+function tfPickSymbol() {
+    var dom = fl.getDocumentDOM();
+    if (!dom) return "ERROR: No document open.";
+
+    var sel = dom.selection;
+    if (sel.length === 1 && sel[0].elementType === "instance" && sel[0].instanceType === "symbol") {
+        if (sel[0].symbolType !== "graphic") return "ERROR: The selected symbol is a " + sel[0].symbolType + ", not a Graphic.";
+        return "OK: " + sel[0].libraryItem.name;
+    }
+    if (sel.length > 1) return "ERROR: Select one symbol instance to pick (selected: " + sel.length + ").";
+
+    var items = dom.library.getSelectedItems();
+    if (items.length === 1) {
+        if (items[0].itemType !== "graphic") return "ERROR: \"" + items[0].name + "\" is a " + items[0].itemType + ", not a Graphic symbol.";
+        return "OK: " + items[0].name;
+    }
+    return "ERROR: Select one Graphic symbol on stage or in the Library, then Pick.";
+}
+
+/**
+ * Create Transition, step 1: copy, swaps and layers, then the line-up view
+ * (copy held one frame over character2, both as outlines). Continue does step 2.
+ * @param {string} targetName  - library path of character2
+ * @param {number} length      - transition length N in frames
+ * @param {string} copyLoop    - "loop" | "play once" for the copy
+ * @returns {string}           - "OK: ..." or "ERROR: ..."
+ */
+function tfCreateTransition(targetName, length, copyLoop) {
+    var usageStart = new Date().getTime();
+    try {
+        var dom = fl.getDocumentDOM();
+        if (!dom) return "ERROR: No document open.";
+        var tl = dom.getTimeline();
+        var lib = dom.library;
+        var N = parseInt(length, 10);
+        if (isNaN(N) || N < 1) return "ERROR: Length must be 1 frame or more.";
+        if (copyLoop !== "play once") copyLoop = "loop";
+
+        // --- 1. Validate the selection ---
+        var sel = dom.selection;
+        if (sel.length !== 1) return "ERROR: Select exactly one character instance (selected: " + sel.length + ").";
+        var el = sel[0];
+        if (el.elementType !== "instance" || el.instanceType !== "symbol") return "ERROR: The selection is not a symbol instance.";
+        if (el.symbolType !== "graphic") return "ERROR: The selected symbol is a " + el.symbolType + ". Only Graphic symbols have frame control.";
+
+        var target = tfFindItem(lib, targetName);
+        if (!target) return "ERROR: Symbol \"" + targetName + "\" is not in the library.";
+        if (target.itemType !== "graphic") return "ERROR: \"" + targetName + "\" is not a Graphic symbol.";
+
+        // The playhead is where character2 starts; the transition runs the N frames before it.
+        var End = tl.currentFrame;
+        var P = End - N;
+        if (P < 0) return "ERROR: The transition needs " + N + " frames before the playhead. Move the playhead to frame " + (N + 1) + " or later, or shorten the length.";
+
+        // The old ghost goes first; deleting layers can drop the selection,
+        // so the instance is found again from a snapshot.
+        var snap = { elementType: el.elementType, libraryItem: { name: el.libraryItem.name }, x: el.x, y: el.y, layer: null };
+        try { snap.layer = { name: el.layer.name }; } catch (e) { }
+        if (tfRemoveGhostLayers(tl)) tl.currentFrame = End;
+        el = snap;
+
+        var loc = tfLocate(tl, el, End);
+        if (!loc) return "ERROR: The selected instance is not on the frame under the playhead. Click the instance again at the playhead.";
+        var li = loc.layer;
+        var layer = tl.layers[li];
+        if (layer.locked) return "ERROR: Layer \"" + layer.name + "\" is locked.";
+        if (!layer.visible) return "ERROR: Layer \"" + layer.name + "\" is hidden.";
+
+        var span = layer.frames[P];
+        if (span.tweenType === "motion object" || layer.frames[End].tweenType === "motion object") {
+            return "ERROR: The transition (" + (P + 1) + "-" + (End + 1) + ") is in a motion tween. Not supported yet.";
+        }
+
+        // --- Edge case: keyframes inside the transition (P and End may be keyframes) ---
+        var blocked = [];
+        for (var f = P + 1; f < End; f++) {
+            if (tfIsKeyframe(layer, f)) blocked.push(f + 1);
+        }
+        if (blocked.length) {
+            return "ERROR: Keyframe at frame " + blocked.join(", ") + " is inside the transition (" + (P + 1) + "-" + (End + 1) + "). Clear it or shorten the length.";
+        }
+
+        // --- character1 at P: the selected instance, or the one instance of P's span
+        // when the animator keyed End ---
+        var endKeyed = tfIsKeyframe(layer, End);
+        var pIndex = loc.index;
+        if (endKeyed) {
+            var pEls = span.elements;
+            if (pEls.length !== 1) return "ERROR: Frame " + (P + 1) + " on layer \"" + layer.name + "\" needs exactly one character instance (found: " + pEls.length + ").";
+            pIndex = 0;
+        }
+        var pEl = span.elements[pIndex];
+        if (!pEl || pEl.elementType !== "instance" || pEl.symbolType !== "graphic") {
+            return "ERROR: No Graphic character instance at frame " + (P + 1) + " on layer \"" + layer.name + "\".";
+        }
+        var sourceItem = pEl.libraryItem;
+        var sourceName = sourceItem.name;
+        if (targetName === sourceName) return "ERROR: The target is the same symbol as the character at frame " + (P + 1) + ".";
+
+        // Pose shown at P, computed before anything changes
+        var symbolLength = sourceItem.timeline.frameCount;
+        var innerAtP = tfInnerFrame(pEl.firstFrame, pEl.loop, P - span.startFrame, symbolLength);
+        var innerAtEnd = tfInnerFrame(innerAtP, copyLoop, N - 1, symbolLength);
+        var endSpan = layer.frames[End];
+        var spanStop = endSpan.startFrame + endSpan.duration; // first frame after character1's span at End
+
+        // --- 1. Keyframe at End (skipped when keyed), swap to character2 from its frame 1 ---
+        tfUseLayer(tl, li);
+        if (!endKeyed) tl.insertKeyframe(End);
+        tfSwap(tl.layers[li].frames[End].elements[loc.index], target, 0, "loop");
+
+        // --- 2. Keyframe at P (skipped when keyed) ---
+        if (span.startFrame !== P) {
+            tl.insertKeyframe(P);
+        }
+
+        // --- 3. Duplicate the symbol and swap the instance at P ---
+        var copyName = tfUniqueCopyName(lib, sourceName);
+        var copyPath = tfFolderOf(sourceName) + copyName;
+        lib.selectNone();
+        if (!lib.duplicateItem(sourceName)) return "ERROR: Could not duplicate \"" + sourceName + "\".";
+        var dup = lib.getSelectedItems();
+        if (dup.length !== 1) return "ERROR: Duplicate of \"" + sourceName + "\" not found in the library.";
+        lib.selectItem(dup[0].name);
+        if (!lib.renameItem(copyName)) return "ERROR: Could not rename \"" + dup[0].name + "\" to \"" + copyName + "\".";
+        tfSwap(tl.layers[li].frames[P].elements[pIndex], tfFindItem(lib, copyPath), innerAtP, copyLoop);
+
+        // --- 4. Distribute to Layers (Ctrl+Shift+D): character2 first, then the copy ---
+        // Each new layer goes right below character1's layer, so distributing
+        // character2 first leaves the order character1, copy, character2.
+        // End on character1's layer becomes blank.
+        tfSelectElement(dom, tl, li, End, loc.index);
+        var targetLi = tfDistribute(dom, tl, tfShortName(targetName));
+
+        tfSelectElement(dom, tl, li, P, pIndex);
+        var copyLi = tfDistribute(dom, tl, copyName);
+        if (copyLi <= targetLi) targetLi++;
+        // character2 stops where character1's span stopped, before any later keyframe of character1
+        if (spanStop < tl.layers[targetLi].frameCount && !tfIsKeyframe(tl.layers[targetLi], spanStop)) {
+            tfUseLayer(tl, targetLi);
+            tl.insertBlankKeyframe(spanStop);
+        }
+
+        // character1's layer: one blank span from P (End's extra blank keyframe goes)
+        if (tfIsKeyframe(tl.layers[li], End) && tl.layers[li].frames[End].elements.length === 0) {
+            tfUseLayer(tl, li);
+            tl.clearKeyframes(End, End + 1);
+        }
+
+        // --- Edge case: copy layer ends before End ---
+        var copyLayer = tl.layers[copyLi];
+        if (End > copyLayer.frameCount - 1) {
+            tfUseLayer(tl, copyLi);
+            tl.insertFrames(End - (copyLayer.frameCount - 1), false, copyLayer.frameCount - 1);
+        }
+
+        // --- Line-up view: the copy stays one more frame, over character2 ---
+        // The swap keeps the anchor point, but assets can sit differently
+        // inside their symbols. Both layers show as outlines, so the animator
+        // moves character2 until it matches the copy, then clicks Continue.
+        tfUseLayer(tl, copyLi);
+        if (tfIsKeyframe(tl.layers[copyLi], End)) tl.clearKeyframes(End, End + 1);
+        var blankAfter = End + 1 < tl.layers[copyLi].frameCount && !tfIsKeyframe(tl.layers[copyLi], End + 1);
+        if (blankAfter) tl.insertBlankKeyframe(End + 1);
+        tl.layers[copyLi].outline = true;
+        tl.layers[targetLi].outline = true;
+        tfSelectElement(dom, tl, targetLi, End, 0);
+        // Only character2 moves; the copy is the reference. Continue unlocks it.
+        tl.layers[copyLi].locked = true;
+        tfSavePending(dom, [tl.name, copyPath, targetName, End, innerAtEnd, blankAfter ? 1 : 0]);
+        delayerzUsage.action("movement", new Date().getTime() - usageStart);
+
+        return "OK: Step 1 of 2. Layer " + copyName + ": frames " + (P + 1) + "-" + End + " (" + copyLoop + ", from inner frame " + (innerAtP + 1) +
+            "). Layer " + tfShortName(targetName) + ": from frame " + (End + 1) + ". Line up " + tfShortName(targetName) +
+            " at frame " + (End + 1) + " with the copy (both shown as outlines): move it, and set its first frame in Properties > Looping if needed. Then click Continue.";
+    } catch (e) {
+        delayerzUsage.error("movement");
+        return "ERROR: " + e;
+    }
+}
+
+// --- Pending step 2, kept in the document so it survives a panel reload ---
+// Fields: timeline name, copy path, character2 path, End, inner frame at End - 1,
+// and 1 when step 1 added the blank keyframe at End + 1.
+var TF_PENDING = "tfPendingTransition";
+
+function tfSavePending(dom, fields) {
+    if (dom.documentHasData(TF_PENDING)) dom.removeDataFromDocument(TF_PENDING);
+    dom.addDataToDocument(TF_PENDING, "string", fields.join("\n"));
+}
+
+function tfReadPending(dom) {
+    try {
+        if (!dom.documentHasData(TF_PENDING)) return null;
+        var p = String(dom.getDataFromDocument(TF_PENDING)).split("\n");
+        if (p.length < 6) return null;
+        return { timeline: p[0], copyPath: p[1], targetName: p[2], end: parseInt(p[3], 10),
+            innerAtEnd: parseInt(p[4], 10), blankAfter: p[5] === "1" };
+    } catch (e) {
+        return null;
+    }
+}
+
+function tfClearPending(dom) {
+    try {
+        if (dom.documentHasData(TF_PENDING)) dom.removeDataFromDocument(TF_PENDING);
+    } catch (e) { }
+}
+
+// --- HELPER: copy layer and character2 layer of the pending transition, or null ---
+// Found by what sits at End: the copy (held one extra frame) and character2's keyframe.
+function tfFindPendingLayers(tl, pend) {
+    var copyLi = -1;
+    var targetLi = -1;
+    for (var i = 0; i < tl.layerCount; i++) {
+        var layer = tl.layers[i];
+        if (pend.end >= layer.frameCount) continue;
+        var els = layer.frames[pend.end].elements;
+        if (els.length !== 1 || els[0].elementType !== "instance" || !els[0].libraryItem) continue;
+        var name = els[0].libraryItem.name;
+        if (name === pend.copyPath && copyLi === -1) copyLi = i;
+        else if (name === pend.targetName && targetLi === -1 && tfIsKeyframe(layer, pend.end)) targetLi = i;
+    }
+    if (copyLi === -1 || targetLi === -1) return null;
+    return { copy: copyLi, target: targetLi };
+}
+
+/**
+ * Create Transition, step 2 (after the line-up): the copy ends at End - 1
+ * again, the ghost goes on, and the copy opens for the re-pose.
+ * @returns {string} - "OK: ..." or "ERROR: ..."
+ */
+function tfContinueTransition() {
+    try {
+        var dom = fl.getDocumentDOM();
+        if (!dom) return "ERROR: No document open.";
+        var pend = tfReadPending(dom);
+        if (!pend) return "ERROR: Nothing to continue. Click Change Movement first.";
+        var tl = dom.getTimeline();
+        if (tl.name !== pend.timeline) return "ERROR: Go back to the timeline \"" + pend.timeline + "\" to continue.";
+        var found = tfFindPendingLayers(tl, pend);
+        if (!found) {
+            tfClearPending(dom);
+            return "ERROR: The transition layers are not at frame " + (pend.end + 1) + " any more. Click Change Movement to start again.";
+        }
+
+        var End = pend.end;
+        var copyLi = found.copy;
+        var targetName = pend.targetName;
+        var copyName = tfShortName(pend.copyPath);
+        var innerAtEnd = pend.innerAtEnd;
+        // Step 1 locked the copy (and the animator may lock character2); these frame edits need them unlocked.
+        tl.layers[copyLi].locked = false;
+        tl.layers[found.target].locked = false;
+
+        // --- Copy back to frames P..End-1: End is blank again ---
+        tfUseLayer(tl, copyLi);
+        if (pend.blankAfter && tfIsKeyframe(tl.layers[copyLi], End + 1)) tl.clearKeyframes(End + 1, End + 2);
+        tl.insertBlankKeyframe(End);
+        tl.layers[copyLi].outline = false;
+        tl.layers[found.target].outline = false;
+        tfClearPending(dom);
+
+        // --- Hand over for the re-pose ---
+        // Ghost of character2 (where and on the first frame the animator chose)
+        // one frame before it starts. Animate's scripting cannot switch the
+        // real onion skin on, so this stands in for it.
+        var targetEl = tl.layers[found.target].frames[End].elements[0];
+        var targetFirst = targetEl.firstFrame;
+        var ghostNote = " Ghost on layer " + TF_GHOST_NAME + ".";
+        var layerCountBefore = tl.layerCount;
+        try {
+            tfAddGhost(dom, tl, copyLi, End - 1, targetName, targetEl);
+        } catch (e) {
+            ghostNote = " Ghost failed: " + e + ".";
+            tfRemoveGhostLayers(tl);
+        }
+        // The ghost is added directly above the copy layer, which pushes it down one
+        if (tl.layerCount > layerCountBefore) copyLi++;
+
+        // Last frame of the copy, one frame before character2
+        tfSelectElement(dom, tl, copyLi, End - 1, 0);
+
+        // Edit the copy in place, on the inner frame shown at End - 1
+        try {
+            dom.enterEditMode("inPlace");
+        } catch (e) {
+            return "OK: Step 2 of 2. Could not enter " + copyName + ": " + e + ". Re-pose inner frame " + (innerAtEnd + 1) + " to match " +
+                tfShortName(targetName) + " frame " + (targetFirst + 1) + "." + ghostNote;
+        }
+        dom.getTimeline().currentFrame = innerAtEnd;
+
+        // The animator re-poses the bones
+        return "OK: Step 2 of 2. Now inside " + copyName + ", frame " + (innerAtEnd + 1) + ": re-pose to match the ghost of " +
+            tfShortName(targetName) + " frame " + (targetFirst + 1) + "." + ghostNote;
+    } catch (e) {
+        delayerzUsage.error("movement");
+        return "ERROR: " + e;
+    }
+}
+
+/**
+ * Panel state: ghost flag, then pending step 2 flag ("10" = ghost, no step 2).
+ * A pending step 2 whose layers are gone from its timeline (undo) is dropped.
+ * @returns {string}
+ */
+function tfPanelState() {
+    var dom = fl.getDocumentDOM();
+    if (!dom) return "00";
+    var pending = "0";
+    var pend = tfReadPending(dom);
+    if (pend) {
+        var tl = dom.getTimeline();
+        if (tl.name !== pend.timeline || tfFindPendingLayers(tl, pend)) pending = "1";
+        else tfClearPending(dom);
+    }
+    return tfHasGhost() + pending;
+}
+
+/**
+ * Delete the ghost layers in every scene and in the timeline being edited.
+ * @returns {string} - "OK: ..." or "ERROR: ..."
+ */
+function tfClearGhost() {
+    try {
+        var dom = fl.getDocumentDOM();
+        if (!dom) return "ERROR: No document open.";
+        var removed = 0;
+        var timelines = [];
+        for (var s = 0; s < dom.timelines.length; s++) timelines.push(dom.timelines[s]);
+        timelines.push(dom.getTimeline());
+        var at = "";
+        for (var t = 0; t < timelines.length; t++) {
+            var tl = timelines[t];
+            // Deleting a layer sends the playhead to frame 1; it goes back to P instead
+            var P = tfGhostTransitionStart(tl);
+            var n = tfRemoveGhostLayers(tl);
+            removed += n;
+            if (n && P !== -1) {
+                try {
+                    tl.currentFrame = P;
+                    at = " Playhead at frame " + (P + 1) + ".";
+                } catch (e) { }
+            }
+        }
+        return removed ? "OK: Ghost removed." + at : "INFO: No ghost layer found.";
+    } catch (e) {
+        return "ERROR: Could not remove the ghost: " + e + ". Exit the symbol and try again.";
+    }
+}
+
+/**
+ * Finish (after the re-pose): leave the copy, back to the timeline with the
+ * ghost, then delete the ghost (the playhead goes to P).
+ * @returns {string} - "OK: ..." or "ERROR: ..."
+ */
+function tfFinishTransition() {
+    try {
+        var dom = fl.getDocumentDOM();
+        if (!dom) return "ERROR: No document open.";
+        // Exit one level at a time until the ghost's timeline is open, or nothing changes
+        for (var i = 0; i < 10 && !tfTimelineHasGhost(dom.getTimeline()); i++) {
+            var before = dom.getTimeline().name;
+            dom.exitEditMode();
+            if (dom.getTimeline().name === before) break;
+        }
+        return tfClearGhost().replace("OK: Ghost removed.", "OK: Transition finished, ghost removed.");
+    } catch (e) {
+        delayerzUsage.error("movement");
+        return "ERROR: " + e;
+    }
+}
+
+// --- HELPER: does this timeline have a ghost layer ---
+function tfTimelineHasGhost(tl) {
+    for (var i = 0; i < tl.layerCount; i++) {
+        if (tl.layers[i].name === TF_GHOST_NAME && tl.layers[i].layerType === "guide") return true;
+    }
+    return false;
+}
+
+/**
+ * Whether a ghost layer exists in any scene or in the timeline being edited.
+ * @returns {string} - "1" or "0"
+ */
+function tfHasGhost() {
+    var dom = fl.getDocumentDOM();
+    if (!dom) return "0";
+    var timelines = [dom.getTimeline()];
+    for (var s = 0; s < dom.timelines.length; s++) timelines.push(dom.timelines[s]);
+    for (var t = 0; t < timelines.length; t++) {
+        var tl = timelines[t];
+        for (var i = 0; i < tl.layerCount; i++) {
+            if (tl.layers[i].name === TF_GHOST_NAME && tl.layers[i].layerType === "guide") return "1";
+        }
+    }
+    return "0";
 }

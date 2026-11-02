@@ -117,10 +117,235 @@
     });
     delayInput.addEventListener("blur", clampDelay);
 
+    // ============================================================
+    // Tabs: Delay | Movement. The last tab used opens next time.
+    // ============================================================
+    var TAB_KEY = "delayerz.tab";
+    var tabs = {
+        delay: { btn: document.getElementById("tabDelayBtn"), panel: document.getElementById("tabDelay") },
+        movement: { btn: document.getElementById("tabMovementBtn"), panel: document.getElementById("tabMovement") }
+    };
+
+    function showTab(name) {
+        for (var key in tabs) {
+            var on = key === name;
+            tabs[key].btn.setAttribute("aria-selected", on ? "true" : "false");
+            tabs[key].panel.hidden = !on;
+        }
+        try {
+            localStorage.setItem(TAB_KEY, name);
+        } catch (e) {
+            // Not saved; the panel keeps working.
+        }
+    }
+
+    tabs.delay.btn.addEventListener("click", function () { showTab("delay"); });
+    tabs.movement.btn.addEventListener("click", function () { showTab("movement"); });
+
+    try {
+        if (localStorage.getItem(TAB_KEY) === "movement") showTab("movement");
+    } catch (e) { }
+
+    // ============================================================
+    // Movement: character1 (selected at the playhead) to character2 (Target)
+    // ============================================================
+    var targetEl = document.getElementById("target");
+    var targetLabel = document.getElementById("targetLabel");
+    var targetName = ""; // full library path of the picked symbol
+    var pickBtn = document.getElementById("pickBtn");
+    var lengthInput = document.getElementById("length");
+    var lengthCell = document.getElementById("lengthCell");
+    var movementBtn = document.getElementById("movementBtn");
+
+    var LENGTH_MIN = 1;
+    var LENGTH_MAX = 999;
+    var MOVEMENT_KEY = "delayerz.movement";
+
+    // --- Remembered length and target (per PC; the panel works without them) ---
+    var movementSettings = loadMovementSettings();
+    if (movementSettings.length) lengthInput.value = movementSettings.length;
+    if (movementSettings.target) setTarget(movementSettings.target);
+
+    function loadMovementSettings() {
+        try {
+            return JSON.parse(localStorage.getItem(MOVEMENT_KEY)) || {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function saveMovementSettings() {
+        try {
+            localStorage.setItem(MOVEMENT_KEY, JSON.stringify({ length: clampLength(), target: targetName }));
+        } catch (e) {
+            // Not saved; the panel keeps working.
+        }
+    }
+
+    // --- Target: Pick takes the selected symbol (stage first, then Library) ---
+    // The label shows the symbol name; hovering shows the full library path
+    function setTarget(name) {
+        targetName = name;
+        targetEl.textContent = name.split("/").pop();
+        targetEl.classList.remove("target-none");
+        targetLabel.title = name;
+    }
+
+    // Back to "none" (after Finish); the symbol stays in the library
+    function clearTarget() {
+        targetName = "";
+        targetEl.textContent = "none";
+        targetEl.classList.add("target-none");
+        targetLabel.removeAttribute("title");
+        saveMovementSettings();
+    }
+
+    pickBtn.addEventListener("click", function () {
+        cs.evalScript("tfPickSymbol()", function (result) {
+            if (result && result.indexOf("OK: ") === 0) {
+                setTarget(result.substring(4));
+                saveMovementSettings();
+                addLog("Target: " + targetName, "info");
+            } else {
+                handleResult(result);
+            }
+        });
+    });
+
+    // --- Length: typing, and drag left/right like the delay ---
+    function clampLength() {
+        var value = parseInt(lengthInput.value, 10);
+        if (isNaN(value)) value = 30;
+        value = Math.min(LENGTH_MAX, Math.max(LENGTH_MIN, value));
+        lengthInput.value = value;
+        return value;
+    }
+
+    var lengthDrag = null;
+
+    lengthCell.addEventListener("pointerdown", function (e) {
+        if (e.button !== 0 || document.activeElement === lengthInput) return;
+        e.preventDefault();
+        lengthDrag = { x: e.clientX, start: clampLength(), moved: false };
+        lengthCell.setPointerCapture(e.pointerId);
+    });
+
+    lengthCell.addEventListener("pointermove", function (e) {
+        if (!lengthDrag) return;
+        var dx = e.clientX - lengthDrag.x;
+        if (!lengthDrag.moved && Math.abs(dx) < 3) return;
+        if (!lengthDrag.moved) {
+            lengthDrag.moved = true;
+            lengthCell.classList.add("scrubbing");
+            document.body.classList.add("scrubbing");
+        }
+        lengthInput.value = lengthDrag.start + Math.round(dx / PX_PER_FRAME);
+        clampLength();
+    });
+
+    function endLengthDrag() {
+        if (!lengthDrag) return;
+        var moved = lengthDrag.moved;
+        lengthDrag = null;
+        lengthCell.classList.remove("scrubbing");
+        document.body.classList.remove("scrubbing");
+        if (moved) {
+            saveMovementSettings();
+        } else {
+            lengthInput.focus();
+            lengthInput.select();
+        }
+    }
+
+    lengthCell.addEventListener("pointerup", endLengthDrag);
+    lengthCell.addEventListener("pointercancel", endLengthDrag);
+    // The label would also forward its click to the input; typing starts in endLengthDrag.
+    lengthCell.addEventListener("click", function (e) {
+        if (e.target !== lengthInput) e.preventDefault();
+    });
+    lengthInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") lengthInput.blur();
+    });
+    lengthInput.addEventListener("blur", function () {
+        clampLength();
+        saveMovementSettings();
+    });
+
+    // --- One button, three steps ---
+    // Change Movement (step 1), Continue (step 2, after lining up character2),
+    // Finish (after the re-pose, while the ghost is there).
+    // The copy loops; play once may come back later.
+    var STEPS = {
+        create: { label: "Change Movement", call: null,
+            title: "Create the transition: character2 starts at the playhead, the copy fills the frames before it" },
+        "continue": { label: "Continue", call: "tfContinueTransition()",
+            title: "Ghost, then open the copy for the re-pose" },
+        finish: { label: "Finish", call: "tfFinishTransition()",
+            title: "Leave the copy and delete the ghost" }
+    };
+    var step = "create";
+
+    // A waiting Continue or Finish also shows as a dot on the Movement tab
+    function setStep(name) {
+        step = name;
+        movementBtn.textContent = STEPS[name].label;
+        movementBtn.title = STEPS[name].title;
+        movementBtn.classList.toggle("continue", name === "continue");
+        movementBtn.classList.toggle("finish", name === "finish");
+        if (name === "create") tabs.movement.btn.removeAttribute("data-step");
+        else tabs.movement.btn.setAttribute("data-step", name);
+    }
+
+    movementBtn.addEventListener("click", function () {
+        var call = STEPS[step].call;
+        var finishing = step === "finish";
+        if (!call) {
+            if (!targetName) {
+                addLog("Pick a symbol to transition to.", "error");
+                return;
+            }
+            saveMovementSettings();
+            call = "tfCreateTransition(" + quote(targetName) + ", " + clampLength() + ", \"loop\")";
+        }
+        setMovementBusy(true);
+        cs.evalScript(call, function (result) {
+            setMovementBusy(false);
+            handleResult(result);
+            if (finishing && result && result.indexOf("OK:") === 0) clearTarget();
+            refreshMovement();
+        });
+    });
+
+    // tfPanelState: ghost flag, then pending step 2 flag. Step 2 wins over the ghost.
+    function refreshMovement() {
+        cs.evalScript("tfPanelState()", function (result) {
+            result = result || "";
+            if (result.charAt(1) === "1") setStep("continue");
+            else if (result.charAt(0) === "1") setStep("finish");
+            else setStep("create");
+        });
+    }
+
+    // Undo, deleting the ghost by hand or switching documents can change it
+    cs.addEventListener("com.adobe.events.flash.documentChanged", refreshMovement);
+    cs.addEventListener("com.adobe.events.flash.timelineChanged", refreshMovement);
+    window.addEventListener("focus", refreshMovement);
+    refreshMovement();
+
+    function setMovementBusy(busy) {
+        movementBtn.disabled = busy;
+        pickBtn.disabled = busy;
+    }
+
+    // JSFL string literal for a library name
+    function quote(s) {
+        return '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+    }
+
     // --- Log: hidden by default, opened with the log button ---
     // Newest entry first, last 20 kept. While the log is closed, a dot on
-    // the button shows that a message arrived (red wins over green).
-    var UNREAD_RANK = { success: 1, error: 2 };
+    // the button shows that a message arrived (red wins over green, green over blue).
+    var UNREAD_RANK = { info: 0, success: 1, error: 2 };
 
     logBtn.addEventListener("click", function () {
         setLogOpen(logEl.hidden);
@@ -170,6 +395,8 @@
         }
         if (result.indexOf("OK:") === 0) {
             addLog(result.replace("OK: ", ""), "success");
+        } else if (result.indexOf("INFO:") === 0) {
+            addLog(result.replace("INFO: ", ""), "info");
         } else {
             addLog(result.replace("ERROR: ", ""), "error");
         }
