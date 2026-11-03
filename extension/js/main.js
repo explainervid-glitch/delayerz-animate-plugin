@@ -148,12 +148,13 @@
     } catch (e) { }
 
     // ============================================================
-    // Movement: character1 (selected at the playhead) to character2 (Target)
+    // Movement: character1 (Source) to character2 (Target)
     // ============================================================
-    var targetEl = document.getElementById("target");
-    var targetLabel = document.getElementById("targetLabel");
-    var targetName = ""; // full library path of the picked symbol
-    var pickBtn = document.getElementById("pickBtn");
+    // name: full library path ("" = not picked); thumb: file URL of the frame preview
+    var slots = {
+        source: { name: "", thumb: "", btn: document.getElementById("sourcePick"), label: document.getElementById("sourceName") },
+        target: { name: "", thumb: "", btn: document.getElementById("targetPick"), label: document.getElementById("targetName") }
+    };
     var lengthInput = document.getElementById("length");
     var lengthCell = document.getElementById("lengthCell");
     var movementBtn = document.getElementById("movementBtn");
@@ -163,10 +164,22 @@
     var LENGTH_MAX = 999;
     var MOVEMENT_KEY = "delayerz.movement";
 
-    // --- Remembered length and target (per PC; the panel works without them) ---
+    // A preview that cannot load (file cleaned up) falls back to the pipette
+    ["source", "target"].forEach(function (slot) {
+        slots[slot].btn.querySelector("img").addEventListener("error", function () {
+            setSlot(slot, slots[slot].name, "");
+        });
+    });
+
+    // --- Remembered length, Source and Target (per PC; the panel works without them) ---
+    // 1.7.5 kept plain names; they come back without a preview.
     var movementSettings = loadMovementSettings();
     if (movementSettings.length) lengthInput.value = movementSettings.length;
-    if (movementSettings.target) setTarget(movementSettings.target);
+    ["source", "target"].forEach(function (slot) {
+        var saved = movementSettings[slot];
+        if (typeof saved === "string" && saved) setSlot(slot, saved, "");
+        else if (saved && saved.name) setSlot(slot, saved.name, saved.thumb);
+    });
 
     function loadMovementSettings() {
         try {
@@ -178,41 +191,65 @@
 
     function saveMovementSettings() {
         try {
-            localStorage.setItem(MOVEMENT_KEY, JSON.stringify({ length: clampLength(), target: targetName }));
+            localStorage.setItem(MOVEMENT_KEY, JSON.stringify({
+                length: clampLength(),
+                source: { name: slots.source.name, thumb: slots.source.thumb },
+                target: { name: slots.target.name, thumb: slots.target.thumb }
+            }));
         } catch (e) {
             // Not saved; the panel keeps working.
         }
     }
 
-    // --- Target: Pick takes the selected symbol (stage first, then Library) ---
-    // The label shows the symbol name; hovering shows the full library path
-    function setTarget(name) {
-        targetName = name;
-        targetEl.textContent = name.split("/").pop();
-        targetEl.classList.remove("target-none");
-        targetLabel.title = name;
+    // --- Tiles: the frame preview (or the pipette) and the symbol name under it ---
+    // Hovering the name shows the full library path.
+    function setSlot(slot, name, thumb) {
+        var s = slots[slot];
+        s.name = name || "";
+        s.thumb = s.name ? thumb || "" : "";
+        var img = s.btn.querySelector("img");
+        var icon = s.btn.querySelector("svg");
+        if (s.thumb) img.src = s.thumb;
+        else img.removeAttribute("src");
+        img.hidden = !s.thumb;
+        icon.style.display = s.thumb ? "none" : ""; // an <svg> has no hidden property
+        s.btn.classList.toggle("has-thumb", !!s.thumb);
+        s.label.textContent = s.name ? s.name.split("/").pop() : "none";
+        s.label.classList.toggle("slot-none", !s.name);
+        if (s.name) s.label.title = s.name;
+        else s.label.removeAttribute("title");
     }
 
-    // Back to "none" (after Done); the symbol stays in the library
-    function clearTarget() {
-        targetName = "";
-        targetEl.textContent = "none";
-        targetEl.classList.add("target-none");
-        targetLabel.removeAttribute("title");
-        saveMovementSettings();
+    function logSlots() {
+        addLog("Source: " + (slots.source.name || "the selected instance") + " → Target: " + (slots.target.name || "none"), "info");
     }
 
-    pickBtn.addEventListener("click", function () {
-        cs.evalScript("tfPickSymbol()", function (result) {
+    // One line per picked slot: "slot<TAB>path<TAB>preview URL"
+    function pick(slot) {
+        cs.evalScript("tfPickSymbol(" + quote(slot) + ")", function (result) {
             if (result && result.indexOf("OK: ") === 0) {
-                setTarget(result.substring(4));
+                result.substring(4).split("\n").forEach(function (line) {
+                    var f = line.split("\t");
+                    if (slots[f[0]]) setSlot(f[0], f[1], f[2]);
+                });
                 saveMovementSettings();
-                addLog("Target: " + targetName, "info");
+                logSlots();
             } else {
                 handleResult(result);
             }
         });
-    });
+    }
+
+    slots.source.btn.addEventListener("click", function () { pick("source"); });
+    slots.target.btn.addEventListener("click", function () { pick("target"); });
+
+    // After Done the character is in the Target movement: it becomes the
+    // Source of the next change, and the Target empties.
+    function nextMovement() {
+        setSlot("source", slots.target.name, slots.target.thumb);
+        setSlot("target", "", "");
+        saveMovementSettings();
+    }
 
     // --- Length: typing, and drag left/right like the delay ---
     function clampLength() {
@@ -303,7 +340,8 @@
     // new target, no new length, no Delay tool.
     function setStepFocus(on) {
         cancelBtn.hidden = !on;
-        pickBtn.disabled = on;
+        slots.source.btn.disabled = on;
+        slots.target.btn.disabled = on;
         lengthInput.disabled = on;
         lengthCell.classList.toggle("locked", on);
         tabs.delay.btn.disabled = on;
@@ -323,18 +361,18 @@
         var call = STEPS[step].call;
         var finishing = step === "finish";
         if (!call) {
-            if (!targetName) {
-                addLog("Pick a symbol to transition to.", "error");
+            if (!slots.target.name) {
+                addLog("Pick a Target: the symbol to change to.", "error");
                 return;
             }
             saveMovementSettings();
-            call = "tfCreateTransition(" + quote(targetName) + ", " + clampLength() + ", \"loop\")";
+            call = "tfCreateTransition(" + quote(slots.target.name) + ", " + clampLength() + ", \"loop\", " + quote(slots.source.name) + ")";
         }
         setMovementBusy(true);
         cs.evalScript(call, function (result) {
             setMovementBusy(false);
             handleResult(result);
-            if (finishing && result && result.indexOf("OK:") === 0) clearTarget();
+            if (finishing && result && result.indexOf("OK:") === 0) nextMovement();
             refreshMovement();
         });
     });
@@ -358,7 +396,7 @@
     function setMovementBusy(busy) {
         movementBtn.disabled = busy;
         cancelBtn.disabled = busy;
-        pickBtn.disabled = busy || step !== "create";
+        slots.source.btn.disabled = slots.target.btn.disabled = busy || step !== "create";
     }
 
     // JSFL string literal for a library name

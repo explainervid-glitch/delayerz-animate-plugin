@@ -443,62 +443,83 @@ body.scrubbing * {
 }
 
 /* ---- Movement: [Target: ANGRY 02][pick], then [30 f], then [Change Movement] ---- */
-.row {
+/* ---- Movement: Source and Target tiles ---- */
+.slots {
     display: flex;
+    align-items: center;
 }
 
-.target-cell {
+.slot {
     flex: 1;
     min-width: 0;
-    height: var(--control-h);
-    line-height: calc(var(--control-h) - 2px);
-    padding: 0 6px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
 }
 
-.target-label {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#target {
-    color: var(--info);
-}
-
-#target.target-none {
+.slot-arrow {
+    flex: none;
+    padding-top: 6px; /* centre on the tiles, not on label + name */
     color: var(--muted);
-    font-weight: 400;
 }
 
-.pick-btn {
-    width: var(--control-h);
-    height: var(--control-h);
-    flex-shrink: 0;
+/* Pick button and frame preview in one */
+.slot-pick {
+    height: 64px;
+    padding: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    color: var(--text);
+    color: var(--muted);
     font: inherit;
     cursor: pointer;
 }
 
-.pick-btn:focus {
+.slot-pick:focus {
     outline: none;
 }
 
-.pick-btn:hover:not(:disabled) {
+.slot-pick:hover:not(:disabled) {
     background: var(--surface-hover);
+    color: var(--text);
 }
 
-.pick-btn:disabled {
+/* Light behind the frame: symbols are drawn for the white stage */
+.slot-pick.has-thumb {
+    background: #f2f2f2;
+}
+
+.slot-pick.has-thumb:hover:not(:disabled) {
+    background: #ffffff;
+    border-color: var(--accent);
+}
+
+.slot-pick:disabled {
     opacity: 0.4;
     cursor: default;
+}
+
+.slot-pick img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.slot-pick > [hidden] {
+    display: none;
+}
+
+.slot-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--info);
+}
+
+.slot-name.slot-none {
+    color: var(--muted);
 }
 
 /* Length cell locked while a step waits */
@@ -555,7 +576,8 @@ body.scrubbing * {
 .field > * + *      { margin-top: 4px; }
 .tool-rail > * + *  { margin-top: 4px; }
 .actions > * + *    { margin-left: 6px; }
-.row > * + *        { margin-left: 4px; }
+.slots > * + *      { margin-left: 6px; }
+.slot > * + *       { margin-top: 4px; }
 .stepper-value > * + * { margin-left: 2px; }
 #logBtn > * + *     { margin-left: 5px; }
 .log-entry > * + *  { margin-left: 6px; }

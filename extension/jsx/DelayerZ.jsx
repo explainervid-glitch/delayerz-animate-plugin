@@ -10,6 +10,7 @@
 // Panel 1.7.2 - Change Movement locks other layers during its steps; Cancel; "Done" button
 // Panel 1.7.3 - Change Movement skips folder layers; panel state never shows an error dialog
 // Panel 1.7.4 - Change Movement re-poses the copy on the playhead frame over the movement 2 outline; no ghost layer
+// Panel 1.7.5 - Change Movement: Source and Target tiles with frame previews; the Source is found at the playhead
 // ============================================================
 
 // ---- zeploy usage helper (begin): an unchanged copy of examples/usage/zeploy-usage.jsfl
@@ -118,7 +119,7 @@ var _lastOp = null;
 // "movement" per Change Movement (step 1), and an error when one fails unexpectedly. Validation messages ("select at
 // least 2 layers") are not counted. Keep the version in step with
 // CSXS/manifest.xml (npm run package checks it).
-var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.7.4");
+var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.7.5");
 
 // --- HELPER: Array.indexOf replacement (not available in ES3) ---
 function arrContains(arr, val) {
@@ -541,7 +542,7 @@ function canUndoDelayerZ() {
 // Character1 to character2 at the playhead, with a transition copy over the
 // N frames before it. One panel button runs the three steps:
 //
-// tfPickSymbol()                         selected symbol for the Target
+// tfPickSymbol(slot)                     selected symbol for the Source or Target, with a thumbnail
 // tfCreateTransition(target, n, loop)    step 1: copy, swaps, layers; line-up view
 // tfContinueTransition()                 step 2: enter the copy on the playhead for the re-pose
 // tfFinishTransition()                   step 3: leave the copy, take its extra frame off
@@ -714,28 +715,121 @@ function tfSwap(el, item, firstFrame, loop) {
     el.loop = loop;
 }
 
+// --- HELPER: does this instance's symbol already run on its layer the frame before f ---
+// That marks character1; character2 starts at the playhead.
+function tfRunsBefore(tl, el, f) {
+    if (f < 1) return false;
+    var loc = tfLocate(tl, el, f);
+    if (!loc) return false;
+    var layer = tl.layers[loc.layer];
+    return f - 1 < layer.frames.length && tfItemNameAt(layer, f - 1) === el.libraryItem.name;
+}
+
+// --- Thumbnails for the panel: PNGs in %LOCALAPPDATA%\Temp\DelayerZ ---
+function tfThumbFolder() {
+    var i = fl.configURI.toLowerCase().indexOf("/adobe/");
+    return fl.configURI.substring(0, i) + "/Temp/DelayerZ/";
+}
+
+// --- HELPER: frame f (0-based) of a symbol as a PNG, return its file URL for the panel, or "" ---
+// exportToPNGSequence writes <name>NNNN.png for frame f + 1 and the frame
+// after; only the first stays. Thumbnails older than a week go (the panel
+// moves the Target's thumbnail to the Source after Done, so the newest stay).
+var TF_THUMB_DAYS = 7;
+
+function tfThumb(item, f, slot) {
+    try {
+        var dir = tfThumbFolder();
+        if (!FLfile.exists(dir)) FLfile.createFolder(dir);
+        var now = new Date().getTime();
+        var files = FLfile.listFolder(dir, "files");
+        for (var k = 0; k < files.length; k++) {
+            var made = parseInt(files[k].split("_")[1], 10); // <slot>_<ms>_NNNN.png
+            if (!isNaN(made) && now - made > TF_THUMB_DAYS * 86400000) FLfile.remove(dir + files[k]);
+        }
+        var base = slot + "_" + now + "_";
+        item.exportToPNGSequence(dir + base + ".png", f + 1, f + 1);
+        var out = [];
+        files = FLfile.listFolder(dir, "files");
+        for (var m = 0; m < files.length; m++) {
+            if (files[m].indexOf(base) === 0) out.push(files[m]);
+        }
+        if (!out.length) return "";
+        out.sort();
+        for (var r = 1; r < out.length; r++) FLfile.remove(dir + out[r]);
+        // "file:///C|/..." is Animate's form; the panel's browser needs "file:///C:/..."
+        return (dir + out[0]).replace("|", ":");
+    } catch (e) {
+        return "";
+    }
+}
+
+// --- HELPER: inner frame an instance shows at the playhead ---
+function tfShownFrame(tl, el) {
+    var f = tl.currentFrame;
+    var loc = tfLocate(tl, el, f);
+    var offset = loc ? f - tl.layers[loc.layer].frames[f].startFrame : 0;
+    return tfInnerFrame(el.firstFrame, el.loop, offset, el.libraryItem.timeline.frameCount);
+}
+
+// --- HELPER: one pick result line, "slot<TAB>path<TAB>thumbnail URL" ---
+function tfPickLine(slot, item, f) {
+    return slot + "\t" + item.name + "\t" + tfThumb(item, f, slot);
+}
+
 /**
- * Library path of the selected Graphic symbol: one instance on stage first,
- * otherwise one item selected in the Library panel.
- * @returns {string} - "OK: <path>" or "ERROR: ..."
+ * Pick for the Source (character1) or Target (character2) slot: one instance
+ * on stage first, otherwise one item selected in the Library. Two instances
+ * on stage fill both slots: the one already running before the playhead is
+ * the Source; otherwise Animate's selection order decides. Each pick comes
+ * with a thumbnail of the frame it shows (frame 1 for a Library item).
+ * @param {string} slot - "source" | "target"
+ * @returns {string} - "OK: " + one line per slot ("slot\tpath\tthumbnail URL"), or "ERROR: ..."
  */
-function tfPickSymbol() {
+function tfPickSymbol(slot) {
     var dom = fl.getDocumentDOM();
     if (!dom) return "ERROR: No document open.";
+    if (slot !== "source") slot = "target";
+    var tl = dom.getTimeline();
 
     var sel = dom.selection;
     if (sel.length === 1 && sel[0].elementType === "instance" && sel[0].instanceType === "symbol") {
         if (sel[0].symbolType !== "graphic") return "ERROR: The selected symbol is a " + sel[0].symbolType + ", not a Graphic.";
-        return "OK: " + sel[0].libraryItem.name;
+        return "OK: " + tfPickLine(slot, sel[0].libraryItem, tfShownFrame(tl, sel[0]));
     }
-    if (sel.length > 1) return "ERROR: Select one symbol instance to pick (selected: " + sel.length + ").";
+    if (sel.length === 2) {
+        for (var s = 0; s < 2; s++) {
+            if (sel[s].elementType !== "instance" || sel[s].instanceType !== "symbol" || sel[s].symbolType !== "graphic") {
+                return "ERROR: Select two Graphic symbol instances (Source and Target), or one.";
+            }
+        }
+        var a = sel[0], b = sel[1];
+        if (a.libraryItem.name === b.libraryItem.name) return "ERROR: Both selected instances are " + a.libraryItem.name + ". Select two different symbols.";
+        if (tfRunsBefore(tl, b, tl.currentFrame) && !tfRunsBefore(tl, a, tl.currentFrame)) { a = sel[1]; b = sel[0]; }
+        return "OK: " + tfPickLine("source", a.libraryItem, tfShownFrame(tl, a)) + "\n" + tfPickLine("target", b.libraryItem, tfShownFrame(tl, b));
+    }
+    if (sel.length > 2) return "ERROR: Select one symbol instance, or two (Source and Target). Selected: " + sel.length + ".";
 
     var items = dom.library.getSelectedItems();
     if (items.length === 1) {
         if (items[0].itemType !== "graphic") return "ERROR: \"" + items[0].name + "\" is a " + items[0].itemType + ", not a Graphic symbol.";
-        return "OK: " + items[0].name;
+        return "OK: " + tfPickLine(slot, items[0], 0);
     }
     return "ERROR: Select one Graphic symbol on stage or in the Library, then Pick.";
+}
+
+// --- HELPER: instances of a symbol at frame f, on normal layers ---
+function tfFindAtFrame(tl, name, f) {
+    var hits = [];
+    for (var i = 0; i < tl.layerCount; i++) {
+        var layer = tl.layers[i];
+        if (layer.layerType !== "normal" || f >= layer.frames.length) continue;
+        var els = layer.frames[f].elements;
+        for (var k = 0; k < els.length; k++) {
+            if (els[k].elementType === "instance" && els[k].libraryItem && els[k].libraryItem.name === name) hits.push(els[k]);
+        }
+    }
+    return hits;
 }
 
 /**
@@ -744,9 +838,10 @@ function tfPickSymbol() {
  * @param {string} targetName  - library path of character2
  * @param {number} length      - transition length N in frames
  * @param {string} copyLoop    - "loop" | "play once" for the copy
+ * @param {string} sourceName  - optional library path of character1 (the Source); without it the selected instance is character1
  * @returns {string}           - "OK: ..." or "ERROR: ..."
  */
-function tfCreateTransition(targetName, length, copyLoop) {
+function tfCreateTransition(targetName, length, copyLoop, sourceName) {
     var usageStart = new Date().getTime();
     try {
         var dom = fl.getDocumentDOM();
@@ -758,9 +853,24 @@ function tfCreateTransition(targetName, length, copyLoop) {
         if (copyLoop !== "play once") copyLoop = "loop";
 
         // --- 1. Validate the selection ---
+        // character1: with a Source, its selected instance, else its one instance
+        // at the playhead; without, the one selected instance.
         var sel = dom.selection;
-        if (sel.length !== 1) return "ERROR: Select exactly one character instance (selected: " + sel.length + ").";
-        var el = sel[0];
+        var el = null;
+        if (sourceName) {
+            for (var s = 0; s < sel.length; s++) {
+                if (sel[s].libraryItem && sel[s].libraryItem.name === sourceName) el = sel[s];
+            }
+            if (!el) {
+                var hits = tfFindAtFrame(tl, sourceName, tl.currentFrame);
+                if (!hits.length) return "ERROR: No " + tfShortName(sourceName) + " (Source) at frame " + (tl.currentFrame + 1) + ". Move the playhead onto it, or pick another Source.";
+                if (hits.length > 1) return "ERROR: " + hits.length + " instances of " + tfShortName(sourceName) + " at frame " + (tl.currentFrame + 1) + ". Select the one to change.";
+                el = hits[0];
+            }
+        } else {
+            if (sel.length !== 1) return "ERROR: Select the character instance at the playhead, or pick a Source (selected: " + sel.length + ").";
+            el = sel[0];
+        }
         if (el.elementType !== "instance" || el.instanceType !== "symbol") return "ERROR: The selection is not a symbol instance.";
         if (el.symbolType !== "graphic") return "ERROR: The selected symbol is a " + el.symbolType + ". Only Graphic symbols have frame control.";
 

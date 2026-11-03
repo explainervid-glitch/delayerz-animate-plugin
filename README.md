@@ -2,7 +2,7 @@
 
 Stagger animations across layers in Adobe Animate with one click.
 
-- **Version:** 1.7.4
+- **Version:** 1.7.5
 - **Host:** Adobe Animate 2021 or newer (Windows)
 - **Ships as:** a dockable CEP panel (Delay and Movement tools) and a Commands menu script
 
@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/c65d4140-fff8-4dfc-bdbb-df289a4a35e7
 
 ## Installation
 
-1. Unzip `DelayerZ-v1.7.4.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
+1. Unzip `DelayerZ-v1.7.5.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
 2. Double click `install.bat` and accept the administrator prompt.
 3. If Animate is open, the installer asks whether to close it.
 4. Start Animate and open **Window > Extensions > DelayerZ**.
@@ -65,7 +65,7 @@ Open **Delay** from the icon rail on the left of the panel (staggered bars):
 3. Choose **Start from**: Bottom, Top, or Random.
 4. Click **Apply**.
 
-Messages (done, or why it could not run) go to the log. Open it with the version button (`v1.7.4` and a list icon) at the bottom of the panel.
+Messages (done, or why it could not run) go to the log. Open it with the version button (`v1.7.5` and a list icon) at the bottom of the panel.
 
 Notes:
 
@@ -77,25 +77,30 @@ Notes:
 
 **Movement** (walking figure in the icon rail) changes a character from one movement (Graphic symbol) to another, with a transition copy you re-pose by hand.
 
-1. Select the new movement symbol (on stage or in the Library) and click the pipette. It shows as **Target**.
+1. Pick the two movements with the tiles at the top. Each tile shows a preview of the frame it picked.
+   - **Source** (the current movement): select its instance on stage (or the symbol in the Library), then click the Source tile.
+   - **Target** (the new movement): select it the same way, then click the Target tile.
+   - Or select both instances on stage and click either tile: the one that already runs before the playhead becomes the Source.
 2. Set the **Transition duration** in frames (drag the number, or click it to type).
-3. Put the playhead where the new movement should start, select the current movement instance there, and click **Change Movement**.
+3. Put the playhead where the new movement should start and click **Change Movement**.
+   - The panel finds the Source instance at the playhead, so no selection is needed. With two instances of it there, select the one to change. Without a Source, select the current movement instance at the playhead.
    - The current movement is duplicated as `<name>_COPY` and fills the frames before the playhead, on its own layer. The new movement starts at the playhead, on a layer below it.
    - If the current movement runs in a classic tween, the copy stays in that tween on the same layer instead, so the motion keeps going.
    - Both layers show as outlines, and every layer except the new movement's is locked. Move the new movement, and set its first frame in **Properties > Looping** if needed, until it lines up with the copy.
 4. Click **Continue** (red). The locks from step 3 go (your own locked layers stay locked). The copy keeps its extra frame over the new movement, and opens on that frame (the playhead). The new movement stays an outline under it. Re-pose the copy to match the outline.
-5. Click **Done** (green). The panel leaves the copy, takes its extra frame off (the copy ends one frame before the new movement again), turns the outlines off, puts the playhead on the first frame of the transition and clears the Target.
+5. Click **Done** (green). The panel leaves the copy, takes its extra frame off (the copy ends one frame before the new movement again), turns the outlines off and puts the playhead on the first frame of the transition. The Target becomes the Source of the next change, and the Target tile empties.
 
-While Continue or Done waits, only that button and **Cancel** under it work; the pipette, the length and the Delay tool are off.
+While Continue or Done waits, only that button and **Cancel** under it work; the Source and Target tiles, the length and the Delay tool are off.
 
 - **Cancel** before Continue puts everything back as it was before Change Movement (layers, locks, and the `_COPY` symbol is deleted). A hidden `TF_BACKUP` guide layer holds the original layer until then.
-- **Cancel** before Done works like Done (the transition stays), but keeps the Target.
+- **Cancel** before Done works like Done (the transition stays), but keeps the Source and Target.
 
 Notes:
 
 - Keyframes between the start of the transition and the playhead stop it; keyframes on those two frames are fine.
 - Undoing step 1 (Ctrl+Z) turns the button back to **Change Movement**.
 - Continue only works in the timeline where Change Movement ran.
+- Previews are PNGs in `%LOCALAPPDATA%\Temp\DelayerZ`; ones older than a week are deleted at the next pick.
 
 ## Usage reporting
 

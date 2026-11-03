@@ -77,19 +77,40 @@
             <!-- ===== Movement: change character1 to character2 at the playhead ===== -->
             <div class="tab-panel" id="tabMovement" role="tabpanel" aria-labelledby="tabMovementBtn" hidden>
 
-                <!-- Target symbol (character2) + Pick -->
-                <div class="row">
-                    <div class="target-cell field-label target-label" id="targetLabel">Target: <span id="target" class="target-none">none</span></div>
-                    <button id="pickBtn" type="button" class="pick-btn"
-                        title="Pick the selected symbol (on stage, or in the Library)" aria-label="Pick symbol">
-                        <!-- Lucide "pipette" v0.460.0, ISC License (lucide.dev) -->
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="m2 22 1-1h3l9-9" />
-                            <path d="M3 21v-3l9-9" />
-                            <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" />
-                        </svg>
-                    </button>
+                <!-- Source (character1) to Target (character2). Each tile picks the selected
+                     symbol and shows the frame it shows; two instances on stage fill both. -->
+                <div class="slots">
+                    <div class="slot">
+                        <span class="field-label">Source</span>
+                        <button id="sourcePick" type="button" class="slot-pick" data-slot="source"
+                            title="Pick the current movement: select it on stage (or in the Library), then click. Without a Source, Change Movement uses the selected instance." aria-label="Pick Source">
+                            <img alt="" hidden>
+                            <!-- Lucide "pipette" v0.460.0, ISC License (lucide.dev) -->
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="m2 22 1-1h3l9-9" />
+                                <path d="M3 21v-3l9-9" />
+                                <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" />
+                            </svg>
+                        </button>
+                        <span class="slot-name slot-none" id="sourceName">none</span>
+                    </div>
+                    <span class="slot-arrow" aria-hidden="true">&rarr;</span>
+                    <div class="slot">
+                        <span class="field-label">Target</span>
+                        <button id="targetPick" type="button" class="slot-pick" data-slot="target"
+                            title="Pick the new movement: select it on stage (or in the Library), then click. Two instances on stage fill Source and Target." aria-label="Pick Target">
+                            <img alt="" hidden>
+                            <!-- Lucide "pipette" v0.460.0, ISC License (lucide.dev) -->
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="m2 22 1-1h3l9-9" />
+                                <path d="M3 21v-3l9-9" />
+                                <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" />
+                            </svg>
+                        </button>
+                        <span class="slot-name slot-none" id="targetName">none</span>
+                    </div>
                 </div>
 
                 <!-- Transition length -->
@@ -115,7 +136,7 @@
             <!-- Footer: one button, version + log icon -->
             <div class="footer">
                 <button id="logBtn" type="button" title="Show log" aria-pressed="false" aria-controls="log">
-                    <span>v1.7.4</span>
+                    <span>v1.7.5</span>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
                         stroke-width="1.2" stroke-linecap="square" aria-hidden="true">
                         <path d="M1.5 2.5h9M1.5 6h9M1.5 9.5h6" />
