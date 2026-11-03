@@ -2,7 +2,7 @@
 
 Stagger animations across layers in Adobe Animate with one click.
 
-- **Version:** 1.7.1
+- **Version:** 1.7.2
 - **Host:** Adobe Animate 2021 or newer (Windows)
 - **Ships as:** a dockable CEP panel (Delay and Movement tools) and a Commands menu script
 
@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/c65d4140-fff8-4dfc-bdbb-df289a4a35e7
 
 ## Installation
 
-1. Unzip `DelayerZ-v1.7.1.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
+1. Unzip `DelayerZ-v1.7.2.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
 2. Double click `install.bat` and accept the administrator prompt.
 3. If Animate is open, the installer asks whether to close it.
 4. Start Animate and open **Window > Extensions > DelayerZ**.
@@ -65,7 +65,7 @@ Open **Delay** from the icon rail on the left of the panel (staggered bars):
 3. Choose **Start from**: Bottom, Top, or Random.
 4. Click **Apply**.
 
-Messages (done, or why it could not run) go to the log. Open it with the version button (`v1.7.1` and a list icon) at the bottom of the panel.
+Messages (done, or why it could not run) go to the log. Open it with the version button (`v1.7.2` and a list icon) at the bottom of the panel.
 
 Notes:
 

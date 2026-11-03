@@ -11,7 +11,7 @@ param(
     [switch]$Elevated
 )
 
-$AppVersion = "1.7.1"
+$AppVersion = "1.7.2"
 
 # ---- Color helpers ----
 function Write-Ok   ($msg) { Write-Host "  [OK] $msg"  -ForegroundColor Green  }
