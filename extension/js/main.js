@@ -157,6 +157,7 @@
     var lengthInput = document.getElementById("length");
     var lengthCell = document.getElementById("lengthCell");
     var movementBtn = document.getElementById("movementBtn");
+    var cancelBtn = document.getElementById("cancelBtn");
 
     var LENGTH_MIN = 1;
     var LENGTH_MAX = 999;
@@ -192,7 +193,7 @@
         targetLabel.title = name;
     }
 
-    // Back to "none" (after Finish); the symbol stays in the library
+    // Back to "none" (after Done); the symbol stays in the library
     function clearTarget() {
         targetName = "";
         targetEl.textContent = "none";
@@ -225,7 +226,7 @@
     var lengthDrag = null;
 
     lengthCell.addEventListener("pointerdown", function (e) {
-        if (e.button !== 0 || document.activeElement === lengthInput) return;
+        if (e.button !== 0 || document.activeElement === lengthInput || lengthInput.disabled) return;
         e.preventDefault();
         lengthDrag = { x: e.clientX, start: clampLength(), moved: false };
         lengthCell.setPointerCapture(e.pointerId);
@@ -274,19 +275,19 @@
 
     // --- One button, three steps ---
     // Change Movement (step 1), Continue (step 2, after lining up character2),
-    // Finish (after the re-pose, while the ghost is there).
+    // Done (after the re-pose, while the ghost is there).
     // The copy loops; play once may come back later.
     var STEPS = {
         create: { label: "Change Movement", call: null,
             title: "Create the transition: character2 starts at the playhead, the copy fills the frames before it" },
         "continue": { label: "Continue", call: "tfContinueTransition()",
             title: "Ghost, then open the copy for the re-pose" },
-        finish: { label: "Finish", call: "tfFinishTransition()",
+        finish: { label: "Done", call: "tfFinishTransition()",
             title: "Leave the copy and delete the ghost" }
     };
     var step = "create";
 
-    // A waiting Continue or Finish also shows as a dot on the Movement icon (while Delay is open)
+    // A waiting Continue or Done also shows as a dot on the Movement icon (while Delay is open)
     function setStep(name) {
         step = name;
         movementBtn.textContent = STEPS[name].label;
@@ -295,7 +296,28 @@
         movementBtn.classList.toggle("finish", name === "finish");
         if (name === "create") tabs.movement.btn.removeAttribute("data-step");
         else tabs.movement.btn.setAttribute("data-step", name);
+        setStepFocus(name !== "create");
     }
+
+    // While Continue or Done waits, only that button and Cancel work: no
+    // new target, no new length, no Delay tool.
+    function setStepFocus(on) {
+        cancelBtn.hidden = !on;
+        pickBtn.disabled = on;
+        lengthInput.disabled = on;
+        lengthCell.classList.toggle("locked", on);
+        tabs.delay.btn.disabled = on;
+        if (on && tabs.movement.panel.hidden) showTab("movement");
+    }
+
+    cancelBtn.addEventListener("click", function () {
+        setMovementBusy(true);
+        cs.evalScript("tfCancelTransition()", function (result) {
+            setMovementBusy(false);
+            handleResult(result);
+            refreshMovement();
+        });
+    });
 
     movementBtn.addEventListener("click", function () {
         var call = STEPS[step].call;
@@ -335,7 +357,8 @@
 
     function setMovementBusy(busy) {
         movementBtn.disabled = busy;
-        pickBtn.disabled = busy;
+        cancelBtn.disabled = busy;
+        pickBtn.disabled = busy || step !== "create";
     }
 
     // JSFL string literal for a library name

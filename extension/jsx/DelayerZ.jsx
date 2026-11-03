@@ -542,6 +542,7 @@ function canUndoDelayerZ() {
 // tfCreateTransition(target, n, loop)    step 1: copy, swaps, layers; line-up view
 // tfContinueTransition()                 step 2: ghost, enter the copy for the re-pose
 // tfFinishTransition()                   step 3: leave the copy, delete the ghost
+// tfCancelTransition()                   undo step 1 (from a backup layer), or stop step 2
 // tfClearGhost()                         delete the TF_GHOST guide layer(s)
 // tfHasGhost()                           "1" when a ghost layer exists
 // tfPanelState()                         ghost flag + pending step 2 flag, e.g. "01"
@@ -844,7 +845,9 @@ function tfCreateTransition(targetName, length, copyLoop) {
         // so the instance is found again from a snapshot.
         var snap = { elementType: el.elementType, libraryItem: { name: el.libraryItem.name }, x: el.x, y: el.y, layer: null };
         try { snap.layer = { name: el.layer.name }; } catch (e) { }
-        if (tfRemoveGhostLayers(tl)) tl.currentFrame = End;
+        var stale = tfRemoveGhostLayers(tl);
+        if (tfFindBackup(tl) !== -1) { tfRemoveBackup(tl); stale++; } // left by an earlier step 1 undone by hand
+        if (stale) tl.currentFrame = End;
         el = snap;
 
         var loc = tfLocate(tl, el, End);
@@ -891,6 +894,19 @@ function tfCreateTransition(targetName, length, copyLoop) {
         var innerAtEnd = tfInnerFrame(innerAtP, copyLoop, N - 1, symbolLength);
         var endSpan = layer.frames[End];
         var spanStop = endSpan.startFrame + endSpan.duration; // first frame after character1's span at End
+
+        // --- Backup for Cancel: character1's layer as it is now, hidden right above it ---
+        // JSFL has no undo, so Cancel puts this layer back instead.
+        var liType = layer.layerType;
+        tfUseLayer(tl, li);
+        tl.duplicateLayers();
+        var backup = tl.layers[li]; // the duplicate goes above; character1's layer moves down one
+        backup.name = TF_BACKUP_NAME;
+        try { backup.layerType = "guide"; } catch (e) { } // guide layers never export
+        backup.visible = false;
+        backup.locked = true;
+        li++;
+        layer = tl.layers[li];
 
         // --- Tween mode: character1 moves in a classic tween through P (or into P) ---
         // The copy then stays on character1's layer, so the tween keeps running
@@ -972,8 +988,10 @@ function tfCreateTransition(targetName, length, copyLoop) {
         tl.layers[targetLi].outline = true;
         tfSelectElement(dom, tl, targetLi, End, 0);
         // Only character2 moves; the copy is the reference. Continue unlocks it.
+        // Every other layer is locked too, so only character2 can be picked on stage.
         tl.layers[copyLi].locked = true;
-        tfSavePending(dom, [tl.name, copyPath, targetName, End, innerAtEnd, blankAfter ? 1 : 0]);
+        var locked = tfLockOthers(tl, targetLi);
+        tfSavePending(dom, [tl.name, copyPath, targetName, End, innerAtEnd, blankAfter ? 1 : 0, liType, locked]);
         delayerzUsage.action("movement", new Date().getTime() - usageStart);
 
         var copyWhere = tweenMode ? "Copy " + copyName + " in the tween on layer " + tl.layers[copyLi].name : "Layer " + copyName;
@@ -988,7 +1006,8 @@ function tfCreateTransition(targetName, length, copyLoop) {
 
 // --- Pending step 2, kept in the document so it survives a panel reload ---
 // Fields: timeline name, copy path, character2 path, End, inner frame at End - 1,
-// and 1 when step 1 added the blank keyframe at End + 1.
+// 1 when step 1 added the blank keyframe at End + 1, character1's layer type,
+// and the layers step 1 locked ("index:name", tab separated).
 var TF_PENDING = "tfPendingTransition";
 
 function tfSavePending(dom, fields) {
@@ -1002,10 +1021,62 @@ function tfReadPending(dom) {
         var p = String(dom.getDataFromDocument(TF_PENDING)).split("\n");
         if (p.length < 6) return null;
         return { timeline: p[0], copyPath: p[1], targetName: p[2], end: parseInt(p[3], 10),
-            innerAtEnd: parseInt(p[4], 10), blankAfter: p[5] === "1" };
+            innerAtEnd: parseInt(p[4], 10), blankAfter: p[5] === "1",
+            liType: p[6] || "normal", locked: p[7] || "" };
     } catch (e) {
         return null;
     }
+}
+
+// --- Step 1 locks: every layer but character2's, put back on Continue or Cancel ---
+// Only layers that were unlocked get locked and listed, so the animator's own
+// locks stay. Folders are skipped: locking one would lock character2's layer
+// inside it too.
+function tfLockOthers(tl, keep) {
+    var list = [];
+    for (var i = 0; i < tl.layerCount; i++) {
+        var layer = tl.layers[i];
+        if (i === keep || layer.locked || layer.layerType === "folder") continue;
+        layer.locked = true;
+        list.push(i + ":" + layer.name);
+    }
+    return list.join("\t");
+}
+
+// Unlock what tfLockOthers locked: same index and name first, else the first
+// locked layer with that name (layers added above it shift the index).
+function tfRestoreLocks(tl, list) {
+    if (!list) return;
+    var entries = list.split("\t");
+    for (var n = 0; n < entries.length; n++) {
+        var cut = entries[n].indexOf(":");
+        var idx = parseInt(entries[n].substring(0, cut), 10);
+        var name = entries[n].substring(cut + 1);
+        if (idx < tl.layerCount && tl.layers[idx].name === name) {
+            tl.layers[idx].locked = false;
+            continue;
+        }
+        for (var i = 0; i < tl.layerCount; i++) {
+            if (tl.layers[i].name === name && tl.layers[i].locked) { tl.layers[i].locked = false; break; }
+        }
+    }
+}
+
+// --- Backup of character1's layer (step 1), hidden guide layer right above it ---
+var TF_BACKUP_NAME = "TF_BACKUP";
+
+function tfFindBackup(tl) {
+    for (var i = 0; i < tl.layerCount; i++) {
+        if (tl.layers[i].name === TF_BACKUP_NAME && tl.layers[i].layerType === "guide") return i;
+    }
+    return -1;
+}
+
+function tfRemoveBackup(tl) {
+    var b = tfFindBackup(tl);
+    if (b === -1) return;
+    tl.layers[b].locked = false;
+    tl.deleteLayer(b);
 }
 
 function tfClearPending(dom) {
@@ -1056,6 +1127,10 @@ function tfContinueTransition() {
             tfClearPending(dom);
             return "ERROR: The transition layers are not at frame " + (pend.end + 1) + " any more. Click Change Movement to start again.";
         }
+        // Step 1's locks go, and so does the Cancel backup (Cancel in step 2 keeps the transition)
+        tfRestoreLocks(tl, pend.locked);
+        tfRemoveBackup(tl);
+        found = tfFindPendingLayers(tl, pend);
 
         var End = pend.end;
         var copyLi = found.copy;
@@ -1178,6 +1253,64 @@ function tfFinishTransition() {
             if (dom.getTimeline().name === before) break;
         }
         return tfClearGhost().replace("OK: Ghost removed.", "OK: Transition finished, ghost removed.");
+    } catch (e) {
+        delayerzUsage.error("movement");
+        return "ERROR: " + e;
+    }
+}
+
+/**
+ * Cancel. In step 1 (line-up): everything step 1 did goes, and character1's
+ * layer comes back from the backup. In step 2 (re-pose): leave the copy and
+ * delete the ghost, like Finish; the transition stays.
+ * @returns {string} - "OK: ...", "INFO: ..." or "ERROR: ..."
+ */
+function tfCancelTransition() {
+    try {
+        var dom = fl.getDocumentDOM();
+        if (!dom) return "ERROR: No document open.";
+        var pend = tfReadPending(dom);
+        if (!pend) {
+            if (tfHasGhost() !== "1") return "INFO: Nothing to cancel.";
+            return tfFinishTransition().replace("OK: Transition finished, ghost removed.", "OK: Re-pose stopped, ghost removed. The transition stays.");
+        }
+
+        var tl = dom.getTimeline();
+        if (tl.name !== pend.timeline) return "ERROR: Go back to the timeline \"" + pend.timeline + "\" to cancel.";
+        var b = tfFindBackup(tl);
+        var found = tfFindPendingLayers(tl, pend);
+        if (b === -1 || !found || b + 1 >= tl.layerCount) {
+            tfRestoreLocks(tl, pend.locked);
+            tfClearPending(dom);
+            return "ERROR: The step 1 layers changed, so they cannot be put back. Use Edit > Undo instead.";
+        }
+
+        // Unlock first: deleting layers below shifts the saved indices
+        tfRestoreLocks(tl, pend.locked);
+
+        // Delete character2's layer, the copy layer and character1's changed layer (right below the backup)
+        var li = b + 1;
+        var liName = tl.layers[li].name;
+        var gone = [found.target, li];
+        if (found.copy !== li) gone.push(found.copy);
+        gone.sort(function (x, y) { return y - x; });
+        for (var g = 0; g < gone.length; g++) {
+            tl.layers[gone[g]].locked = false;
+            tl.deleteLayer(gone[g]);
+        }
+
+        // The backup becomes character1's layer again
+        var layer = tl.layers[b];
+        layer.locked = false;
+        try { layer.layerType = pend.liType; } catch (e) { }
+        layer.visible = true;
+        layer.name = liName;
+        if (dom.library.itemExists(pend.copyPath)) dom.library.deleteItem(pend.copyPath);
+        tfClearPending(dom);
+
+        tfUseLayer(tl, b);
+        tl.currentFrame = pend.end;
+        return "OK: Change Movement cancelled. Layer " + liName + " is back as it was.";
     } catch (e) {
         delayerzUsage.error("movement");
         return "ERROR: " + e;

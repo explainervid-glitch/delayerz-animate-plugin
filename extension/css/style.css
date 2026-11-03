@@ -501,6 +501,48 @@ body.scrubbing * {
     cursor: default;
 }
 
+/* Length cell locked while a step waits */
+.stepper-value.locked {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.tool-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+    background: transparent;
+}
+
+/* Cancel: small text link under the main button */
+.cancel-link {
+    align-self: center;
+    padding: 0 4px;
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font: inherit;
+    font-size: 11px;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.cancel-link:hover:not(:disabled) {
+    color: var(--text);
+}
+
+.cancel-link:focus {
+    outline: none;
+}
+
+.cancel-link[hidden] {
+    display: none;
+}
+
+.cancel-link:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
 /* ---- Spacing between children ----
    Margins instead of flex gap: the panel browser in Animate 2021-2022 is too
    old for gap in flex layouts (needs Chromium 84). ---- */
@@ -509,6 +551,7 @@ body.scrubbing * {
 .panel > .footer,
 .panel > .log       { margin-top: 6px; }
 .tab-panel > * + *  { margin-top: 10px; }
+.tab-panel > .cancel-link { margin-top: 4px; }
 .field > * + *      { margin-top: 4px; }
 .tool-rail > * + *  { margin-top: 4px; }
 .actions > * + *    { margin-left: 6px; }

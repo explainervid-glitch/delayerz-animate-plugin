@@ -78,19 +78,24 @@ Notes:
 **Movement** (walking figure in the icon rail) changes a character from one movement (Graphic symbol) to another, with a transition copy you re-pose by hand.
 
 1. Select the new movement symbol (on stage or in the Library) and click the pipette. It shows as **Target**.
-2. Set the transition length in frames (drag the number, or click it to type).
+2. Set the **Transition duration** in frames (drag the number, or click it to type).
 3. Put the playhead where the new movement should start, select the current movement instance there, and click **Change Movement**.
    - The current movement is duplicated as `<name>_COPY` and fills the frames before the playhead, on its own layer. The new movement starts at the playhead, on a layer below it.
-   - Both layers show as outlines and the copy layer is locked. Move the new movement, and set its first frame in **Properties > Looping** if needed, until it lines up with the copy.
-4. Click **Continue** (red). A red ghost of the new movement appears one frame before it starts, and the copy opens on that frame. Re-pose the copy to match the ghost.
-5. Click **Finish** (green). The panel leaves the copy, deletes the ghost, puts the playhead on the first frame of the transition and clears the Target.
+   - If the current movement runs in a classic tween, the copy stays in that tween on the same layer instead, so the motion keeps going.
+   - Both layers show as outlines, and every layer except the new movement's is locked. Move the new movement, and set its first frame in **Properties > Looping** if needed, until it lines up with the copy.
+4. Click **Continue** (red). The locks from step 3 go (your own locked layers stay locked). A red ghost of the new movement appears one frame before it starts, and the copy opens on that frame. Re-pose the copy to match the ghost.
+5. Click **Done** (green). The panel leaves the copy, deletes the ghost, puts the playhead on the first frame of the transition and clears the Target.
+
+While Continue or Done waits, only that button and **Cancel** under it work; the pipette, the length and the Delay tool are off.
+
+- **Cancel** before Continue puts everything back as it was before Change Movement (layers, locks, and the `_COPY` symbol is deleted). A hidden `TF_BACKUP` guide layer holds the original layer until then.
+- **Cancel** before Done leaves the copy and deletes the ghost, but keeps the transition and the Target.
 
 Notes:
 
 - Keyframes between the start of the transition and the playhead stop it; keyframes on those two frames are fine.
 - Undoing step 1 (Ctrl+Z) turns the button back to **Change Movement**.
 - Continue only works in the timeline where Change Movement ran.
-- While Continue or Finish is waiting and Delay is open, a red or green dot shows on the Movement icon.
 
 ## Usage reporting
 

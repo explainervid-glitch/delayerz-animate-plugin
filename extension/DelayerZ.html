@@ -93,17 +93,23 @@
                 </div>
 
                 <!-- Transition length -->
-                <div class="stepper">
-                    <label class="stepper-value" id="lengthCell" title="Transition length in frames. Drag left or right to change. Click to type.">
-                        <input type="number" id="length" value="30" min="1" max="999" aria-label="Transition length in frames">
-                        <span class="unit" aria-hidden="true">f</span>
-                    </label>
+                <div class="field">
+                    <label class="field-label" for="length">Transition duration</label>
+                    <div class="stepper">
+                        <label class="stepper-value" id="lengthCell" title="Transition length in frames. Drag left or right to change. Click to type.">
+                            <input type="number" id="length" value="30" min="1" max="999">
+                            <span class="unit" aria-hidden="true">f</span>
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Change Movement / Continue / Finish (one button, three steps) -->
                 <div class="actions">
                     <button id="movementBtn" title="Create the transition: character2 starts at the playhead, the copy fills the frames before it">Change Movement</button>
                 </div>
+
+                <!-- Cancel: only while Continue or Finish waits -->
+                <button id="cancelBtn" type="button" class="cancel-link" hidden>Cancel</button>
             </div>
 
             <!-- Footer: one button, version + log icon -->
