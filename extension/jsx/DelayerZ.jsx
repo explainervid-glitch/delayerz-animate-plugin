@@ -9,6 +9,7 @@
 // Panel 1.7.1 - Change Movement keeps the copy in a classic tween; ghost follows the lined-up character2
 // Panel 1.7.2 - Change Movement locks other layers during its steps; Cancel; "Done" button
 // Panel 1.7.3 - Change Movement skips folder layers; panel state never shows an error dialog
+// Panel 1.7.4 - Change Movement re-poses the copy on the playhead frame over the movement 2 outline; no ghost layer
 // ============================================================
 
 // ---- zeploy usage helper (begin): an unchanged copy of examples/usage/zeploy-usage.jsfl
@@ -117,7 +118,7 @@ var _lastOp = null;
 // "movement" per Change Movement (step 1), and an error when one fails unexpectedly. Validation messages ("select at
 // least 2 layers") are not counted. Keep the version in step with
 // CSXS/manifest.xml (npm run package checks it).
-var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.7.3");
+var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.7.4");
 
 // --- HELPER: Array.indexOf replacement (not available in ES3) ---
 function arrContains(arr, val) {
@@ -542,12 +543,10 @@ function canUndoDelayerZ() {
 //
 // tfPickSymbol()                         selected symbol for the Target
 // tfCreateTransition(target, n, loop)    step 1: copy, swaps, layers; line-up view
-// tfContinueTransition()                 step 2: ghost, enter the copy for the re-pose
-// tfFinishTransition()                   step 3: leave the copy, delete the ghost
+// tfContinueTransition()                 step 2: enter the copy on the playhead for the re-pose
+// tfFinishTransition()                   step 3: leave the copy, take its extra frame off
 // tfCancelTransition()                   undo step 1 (from a backup layer), or stop step 2
-// tfClearGhost()                         delete the TF_GHOST guide layer(s)
-// tfHasGhost()                           "1" when a ghost layer exists
-// tfPanelState()                         ghost flag + pending step 2 flag, e.g. "01"
+// tfPanelState()                         re-pose flag + line-up flag, e.g. "01"
 //
 // Frame numbers are 0-based in JSFL and 1-based in every message.
 // ============================================================
@@ -664,11 +663,8 @@ function tfDistribute(dom, tl, layerName) {
     return before + 1;
 }
 
-// --- Ghost: character2's first pose on a guide layer, shown while re-posing ---
+// --- Ghost guide layer of DelayerZ 1.7.3 and older; step 1 deletes any left over ---
 var TF_GHOST_NAME = "TF_GHOST";
-var TF_GHOST_ALPHA = 30;
-var TF_GHOST_RED = 0xFF0000;
-var TF_GHOST_TINT = 50;
 
 // --- HELPER: delete every ghost layer of a timeline, return how many ---
 function tfRemoveGhostLayers(tl) {
@@ -683,88 +679,20 @@ function tfRemoveGhostLayers(tl) {
     return removed;
 }
 
-// --- HELPER: P of the transition under a ghost layer, or -1 ---
-// The ghost sits on End - 1, directly above the copy layer. P is the first
-// keyframe of the copy's run there (in a tween the copy has keyframes at P
-// and End - 1).
-function tfGhostTransitionStart(tl) {
-    for (var i = 0; i < tl.layerCount - 1; i++) {
-        var g = tl.layers[i];
-        if (g.name !== TF_GHOST_NAME || g.layerType !== "guide") continue;
-        for (var f = 0; f < g.frames.length; f++) {
-            if (g.frames[f].startFrame !== f || !g.frames[f].elements.length) continue;
-            var copy = tl.layers[i + 1];
-            if (f >= copy.frames.length || !copy.frames[f].elements.length) return -1;
-            var start = copy.frames[f].startFrame;
-            var name = tfItemNameAt(copy, start);
-            while (start > 0 && name && tfItemNameAt(copy, start - 1) === name) start = copy.frames[start - 1].startFrame;
-            return start;
-        }
-    }
-    return -1;
-}
-
 // --- HELPER: library name of the one instance at frame f of a layer, or "" ---
 function tfItemNameAt(layer, f) {
     var els = layer.frames[f].elements;
     return els.length === 1 && els[0].libraryItem ? els[0].libraryItem.name : "";
 }
 
-// --- HELPER: guide layer above layer li with character2 on frame f, faded ---
-// Copies the matrix and first frame of `source` (character2 at P + N, as the
-// animator lined it up), so the ghost shows exactly where and how character2
-// starts. Returns the ghost layer index.
-function tfAddGhost(dom, tl, li, f, targetName, source) {
-    var sourceFirst = source.firstFrame;
-    tl.setSelectedLayers(li, true);
-    tl.currentLayer = li;
-    var g = tl.addNewLayer(TF_GHOST_NAME, "guide", true);
-    var ghost = tl.layers[g];
-
-    // One blank keyframe span holding only frame f (one call for f and f + 1)
-    if (ghost.frameCount <= f) tl.insertFrames(f - ghost.frameCount + 1, false, ghost.frameCount - 1);
-    tl.convertToBlankKeyframes(f, Math.min(f + 2, tl.layers[g].frameCount));
-
-    tl.currentLayer = g;
-    tl.currentFrame = f;
-    dom.selectNone();
-    dom.library.addItemToDocument({ x: source.x, y: source.y }, targetName);
-    var el = tl.layers[g].frames[f].elements[0];
-    el.matrix = source.matrix;
-    el.firstFrame = sourceFirst;
-    el.loop = "single frame";
-    // Faded red: Advanced color keeps the alpha and adds a 50% red tint.
-    // Set directly (no selection, ~0 ms); the selection route is a fallback
-    // in case Animate ignores the direct write.
-    tfTintRed(el);
-    if (tl.layers[g].frames[f].elements[0].colorMode !== "advanced") {
-        dom.selectNone();
-        dom.selection = [tl.layers[g].frames[f].elements[0]];
-        dom.setInstanceAlpha(TF_GHOST_ALPHA);
-        tfTintRed(dom.selection[0]);
-        if (dom.selection[0].colorMode !== "advanced") dom.setInstanceTint(TF_GHOST_RED, TF_GHOST_TINT);
-        dom.selectNone();
-    }
-
-    // Wireframe in red: outline view uses the layer color
-    tl.layers[g].color = "#FF0000";
-    tl.layers[g].outline = true;
-    tl.layers[g].locked = true;
-    return g;
-}
-
-// --- HELPER: Advanced color effect, alpha TF_GHOST_ALPHA plus a red tint ---
-function tfTintRed(el) {
-    var keep = (100 - TF_GHOST_TINT);
-    el.colorMode = "advanced";
-    el.colorAlphaPercent = TF_GHOST_ALPHA;
-    el.colorAlphaAmount = 0;
-    el.colorRedPercent = keep;
-    el.colorGreenPercent = keep;
-    el.colorBluePercent = keep;
-    el.colorRedAmount = Math.round(255 * TF_GHOST_TINT / 100);
-    el.colorGreenAmount = 0;
-    el.colorBlueAmount = 0;
+// --- HELPER: P, the first frame of the copy's run through frame f ---
+// In a tween the copy has keyframes at P and End - 1, so the run walks back
+// over keyframes with the same symbol.
+function tfCopyStart(layer, f) {
+    var start = layer.frames[f].startFrame;
+    var name = tfItemNameAt(layer, start);
+    while (start > 0 && name && tfItemNameAt(layer, start - 1) === name) start = layer.frames[start - 1].startFrame;
+    return start;
 }
 
 // --- HELPER: select one element at frame f of layer li, return the selection ---
@@ -1008,10 +936,11 @@ function tfCreateTransition(targetName, length, copyLoop) {
     }
 }
 
-// --- Pending step 2, kept in the document so it survives a panel reload ---
+// --- Pending transition, kept in the document so it survives a panel reload ---
 // Fields: timeline name, copy path, character2 path, End, inner frame at End - 1,
 // 1 when step 1 added the blank keyframe at End + 1, character1's layer type,
-// and the layers step 1 locked ("index:name", tab separated).
+// the layers step 1 locked ("index:name", tab separated), and the stage
+// (1 = line-up, waiting for Continue; 2 = re-pose, waiting for Done).
 var TF_PENDING = "tfPendingTransition";
 
 function tfSavePending(dom, fields) {
@@ -1026,7 +955,7 @@ function tfReadPending(dom) {
         if (p.length < 6) return null;
         return { timeline: p[0], copyPath: p[1], targetName: p[2], end: parseInt(p[3], 10),
             innerAtEnd: parseInt(p[4], 10), blankAfter: p[5] === "1",
-            liType: p[6] || "normal", locked: p[7] || "" };
+            liType: p[6] || "normal", locked: p[7] || "", stage: p[8] === "2" ? 2 : 1 };
     } catch (e) {
         return null;
     }
@@ -1114,8 +1043,9 @@ function tfFindPendingLayers(tl, pend) {
 }
 
 /**
- * Create Transition, step 2 (after the line-up): the copy ends at End - 1
- * again, the ghost goes on, and the copy opens for the re-pose.
+ * Create Transition, step 2 (after the line-up): the copy keeps its extra
+ * frame over character2, character2 stays an outline, and the copy opens on
+ * that frame (End) for the re-pose. Done takes the extra frame off.
  * @returns {string} - "OK: ..." or "ERROR: ..."
  */
 function tfContinueTransition() {
@@ -1124,6 +1054,7 @@ function tfContinueTransition() {
         if (!dom) return "ERROR: No document open.";
         var pend = tfReadPending(dom);
         if (!pend) return "ERROR: Nothing to continue. Click Change Movement first.";
+        if (pend.stage === 2) return "ERROR: The re-pose is already open. Click Done when the copy matches.";
         var tl = dom.getTimeline();
         if (tl.name !== pend.timeline) return "ERROR: Go back to the timeline \"" + pend.timeline + "\" to continue.";
         var found = tfFindPendingLayers(tl, pend);
@@ -1140,51 +1071,33 @@ function tfContinueTransition() {
         var copyLi = found.copy;
         var targetName = pend.targetName;
         var copyName = tfShortName(pend.copyPath);
-        var innerAtEnd = pend.innerAtEnd;
-        // Step 1 locked the copy (and the animator may lock character2); these frame edits need them unlocked.
+        // Step 1 locked the copy; it opens for editing now
         tl.layers[copyLi].locked = false;
-        tl.layers[found.target].locked = false;
 
-        // --- Copy back to frames P..End-1: End is blank again ---
-        tfUseLayer(tl, copyLi);
-        if (pend.blankAfter && tfIsKeyframe(tl.layers[copyLi], End + 1)) tl.clearKeyframes(End + 1, End + 2);
-        tl.insertBlankKeyframe(End);
+        // --- Re-pose view: the copy solid, character2 as an outline under it ---
         tl.layers[copyLi].outline = false;
-        tl.layers[found.target].outline = false;
-        tfClearPending(dom);
+        tl.layers[found.target].outline = true;
+        tfSavePending(dom, [pend.timeline, pend.copyPath, targetName, End, pend.innerAtEnd, pend.blankAfter ? 1 : 0, pend.liType, "", 2]);
 
-        // --- Hand over for the re-pose ---
-        // Ghost of character2 (where and on the first frame the animator chose)
-        // one frame before it starts. Animate's scripting cannot switch the
-        // real onion skin on, so this stands in for it.
-        var targetEl = tl.layers[found.target].frames[End].elements[0];
-        var targetFirst = targetEl.firstFrame;
-        var ghostNote = " Ghost on layer " + TF_GHOST_NAME + ".";
-        var layerCountBefore = tl.layerCount;
-        try {
-            tfAddGhost(dom, tl, copyLi, End - 1, targetName, targetEl);
-        } catch (e) {
-            ghostNote = " Ghost failed: " + e + ".";
-            tfRemoveGhostLayers(tl);
-        }
-        // The ghost is added directly above the copy layer, which pushes it down one
-        if (tl.layerCount > layerCountBefore) copyLi++;
+        // Inner frame the copy shows at End
+        var key = tl.layers[copyLi].frames[End];
+        var copyEl = key.elements[0];
+        var inner = tfInnerFrame(copyEl.firstFrame, copyEl.loop, End - key.startFrame, copyEl.libraryItem.timeline.frameCount);
+        var targetFirst = tl.layers[found.target].frames[End].elements[0].firstFrame;
 
-        // Last frame of the copy, one frame before character2
-        tfSelectElement(dom, tl, copyLi, End - 1, 0);
-
-        // Edit the copy in place, on the inner frame shown at End - 1
+        // Edit the copy in place on End, over character2
+        tfSelectElement(dom, tl, copyLi, End, 0);
         try {
             dom.enterEditMode("inPlace");
         } catch (e) {
-            return "OK: Step 2 of 2. Could not enter " + copyName + ": " + e + ". Re-pose inner frame " + (innerAtEnd + 1) + " to match " +
-                tfShortName(targetName) + " frame " + (targetFirst + 1) + "." + ghostNote;
+            return "OK: Step 2 of 2. Could not enter " + copyName + ": " + e + ". Re-pose inner frame " + (inner + 1) + " to match " +
+                tfShortName(targetName) + " frame " + (targetFirst + 1) + ", then click Done.";
         }
-        dom.getTimeline().currentFrame = innerAtEnd;
+        dom.getTimeline().currentFrame = inner;
 
         // The animator re-poses the bones
-        return "OK: Step 2 of 2. Now inside " + copyName + ", frame " + (innerAtEnd + 1) + ": re-pose to match the ghost of " +
-            tfShortName(targetName) + " frame " + (targetFirst + 1) + "." + ghostNote;
+        return "OK: Step 2 of 2. Now inside " + copyName + " at frame " + (End + 1) + " (inner frame " + (inner + 1) + "): re-pose to match the outline of " +
+            tfShortName(targetName) + " frame " + (targetFirst + 1) + ". Then click Done.";
     } catch (e) {
         delayerzUsage.error("movement");
         return "ERROR: " + e;
@@ -1192,8 +1105,9 @@ function tfContinueTransition() {
 }
 
 /**
- * Panel state: ghost flag, then pending step 2 flag ("10" = ghost, no step 2).
- * A pending step 2 whose layers are gone from its timeline (undo) is dropped.
+ * Panel state: re-pose flag (waiting for Done), then line-up flag (waiting
+ * for Continue). "00" = nothing pending. A pending transition whose layers
+ * are gone from its timeline (undo) is dropped.
  * @returns {string}
  */
 function tfPanelState() {
@@ -1201,67 +1115,56 @@ function tfPanelState() {
     try {
         var dom = fl.getDocumentDOM();
         if (!dom) return "00";
-        var pending = "0";
         var pend = tfReadPending(dom);
-        if (pend) {
-            var tl = dom.getTimeline();
-            if (tl.name !== pend.timeline || tfFindPendingLayers(tl, pend)) pending = "1";
-            else tfClearPending(dom);
-        }
-        return tfHasGhost() + pending;
+        if (!pend) return "00";
+        // Inside the copy (re-pose) the open timeline is the copy's, so the layers are not checked there
+        var tl = dom.getTimeline();
+        if (tl.name !== pend.timeline || tfFindPendingLayers(tl, pend)) return pend.stage === 2 ? "10" : "01";
+        tfClearPending(dom);
+        return "00";
     } catch (e) {
         return "00";
     }
 }
 
 /**
- * Delete the ghost layers in every scene and in the timeline being edited.
- * @returns {string} - "OK: ..." or "ERROR: ..."
- */
-function tfClearGhost() {
-    try {
-        var dom = fl.getDocumentDOM();
-        if (!dom) return "ERROR: No document open.";
-        var removed = 0;
-        var timelines = [];
-        for (var s = 0; s < dom.timelines.length; s++) timelines.push(dom.timelines[s]);
-        timelines.push(dom.getTimeline());
-        var at = "";
-        for (var t = 0; t < timelines.length; t++) {
-            var tl = timelines[t];
-            // Deleting a layer sends the playhead to frame 1; it goes back to P instead
-            var P = tfGhostTransitionStart(tl);
-            var n = tfRemoveGhostLayers(tl);
-            removed += n;
-            if (n && P !== -1) {
-                try {
-                    tl.currentFrame = P;
-                    at = " Playhead at frame " + (P + 1) + ".";
-                } catch (e) { }
-            }
-        }
-        return removed ? "OK: Ghost removed." + at : "INFO: No ghost layer found.";
-    } catch (e) {
-        return "ERROR: Could not remove the ghost: " + e + ". Exit the symbol and try again.";
-    }
-}
-
-/**
- * Finish (after the re-pose): leave the copy, back to the timeline with the
- * ghost, then delete the ghost (the playhead goes to P).
+ * Done (after the re-pose): leave the copy, take its extra frame over
+ * character2 off (End is blank again), outlines off, playhead to P.
  * @returns {string} - "OK: ..." or "ERROR: ..."
  */
 function tfFinishTransition() {
     try {
         var dom = fl.getDocumentDOM();
         if (!dom) return "ERROR: No document open.";
-        // Exit one level at a time until the ghost's timeline is open, or nothing changes
-        for (var i = 0; i < 10 && !tfTimelineHasGhost(dom.getTimeline()); i++) {
+        var pend = tfReadPending(dom);
+        if (!pend || pend.stage !== 2) return "INFO: No re-pose to finish.";
+        // Exit one level at a time until the transition's timeline is open, or nothing changes
+        for (var i = 0; i < 10 && dom.getTimeline().name !== pend.timeline; i++) {
             var before = dom.getTimeline().name;
             dom.exitEditMode();
             if (dom.getTimeline().name === before) break;
         }
-        return tfClearGhost().replace("OK: Ghost removed.", "OK: Transition finished, ghost removed.");
+        var tl = dom.getTimeline();
+        if (tl.name !== pend.timeline) return "ERROR: Go back to the timeline \"" + pend.timeline + "\" to finish.";
+        var found = tfFindPendingLayers(tl, pend);
+        tfClearPending(dom);
+        if (!found) return "ERROR: The transition layers are not at frame " + (pend.end + 1) + " any more. Nothing changed.";
+
+        // --- Copy back to frames P..End-1: End is blank again ---
+        var End = pend.end;
+        var copyLi = found.copy;
+        var copyLocked = tl.layers[copyLi].locked;
+        tl.layers[copyLi].locked = false;
+        tfUseLayer(tl, copyLi);
+        if (pend.blankAfter && tfIsKeyframe(tl.layers[copyLi], End + 1)) tl.clearKeyframes(End + 1, End + 2);
+        tl.insertBlankKeyframe(End);
+        tl.layers[copyLi].outline = false;
+        tl.layers[copyLi].locked = copyLocked;
+        tl.layers[found.target].outline = false;
+
+        var P = tfCopyStart(tl.layers[copyLi], End - 1);
+        tl.currentFrame = P;
+        return "OK: Transition finished. Playhead at frame " + (P + 1) + ".";
     } catch (e) {
         delayerzUsage.error("movement");
         return "ERROR: " + e;
@@ -1270,8 +1173,8 @@ function tfFinishTransition() {
 
 /**
  * Cancel. In step 1 (line-up): everything step 1 did goes, and character1's
- * layer comes back from the backup. In step 2 (re-pose): leave the copy and
- * delete the ghost, like Finish; the transition stays.
+ * layer comes back from the backup. In step 2 (re-pose): same as Done; the
+ * transition stays.
  * @returns {string} - "OK: ...", "INFO: ..." or "ERROR: ..."
  */
 function tfCancelTransition() {
@@ -1279,10 +1182,8 @@ function tfCancelTransition() {
         var dom = fl.getDocumentDOM();
         if (!dom) return "ERROR: No document open.";
         var pend = tfReadPending(dom);
-        if (!pend) {
-            if (tfHasGhost() !== "1") return "INFO: Nothing to cancel.";
-            return tfFinishTransition().replace("OK: Transition finished, ghost removed.", "OK: Re-pose stopped, ghost removed. The transition stays.");
-        }
+        if (!pend) return "INFO: Nothing to cancel.";
+        if (pend.stage === 2) return tfFinishTransition().replace("OK: Transition finished.", "OK: Re-pose stopped. The transition stays.");
 
         var tl = dom.getTimeline();
         if (tl.name !== pend.timeline) return "ERROR: Go back to the timeline \"" + pend.timeline + "\" to cancel.";
@@ -1324,30 +1225,4 @@ function tfCancelTransition() {
         delayerzUsage.error("movement");
         return "ERROR: " + e;
     }
-}
-
-// --- HELPER: does this timeline have a ghost layer ---
-function tfTimelineHasGhost(tl) {
-    for (var i = 0; i < tl.layerCount; i++) {
-        if (tl.layers[i].name === TF_GHOST_NAME && tl.layers[i].layerType === "guide") return true;
-    }
-    return false;
-}
-
-/**
- * Whether a ghost layer exists in any scene or in the timeline being edited.
- * @returns {string} - "1" or "0"
- */
-function tfHasGhost() {
-    var dom = fl.getDocumentDOM();
-    if (!dom) return "0";
-    var timelines = [dom.getTimeline()];
-    for (var s = 0; s < dom.timelines.length; s++) timelines.push(dom.timelines[s]);
-    for (var t = 0; t < timelines.length; t++) {
-        var tl = timelines[t];
-        for (var i = 0; i < tl.layerCount; i++) {
-            if (tl.layers[i].name === TF_GHOST_NAME && tl.layers[i].layerType === "guide") return "1";
-        }
-    }
-    return "0";
 }

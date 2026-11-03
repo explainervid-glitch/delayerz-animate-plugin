@@ -2,7 +2,7 @@
 
 Stagger animations across layers in Adobe Animate with one click.
 
-- **Version:** 1.7.3
+- **Version:** 1.7.4
 - **Host:** Adobe Animate 2021 or newer (Windows)
 - **Ships as:** a dockable CEP panel (Delay and Movement tools) and a Commands menu script
 
@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/c65d4140-fff8-4dfc-bdbb-df289a4a35e7
 
 ## Installation
 
-1. Unzip `DelayerZ-v1.7.3.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
+1. Unzip `DelayerZ-v1.7.4.zip`. It contains the `DelayerZ` folder, `install.bat` and `operator.ps1`.
 2. Double click `install.bat` and accept the administrator prompt.
 3. If Animate is open, the installer asks whether to close it.
 4. Start Animate and open **Window > Extensions > DelayerZ**.
@@ -65,7 +65,7 @@ Open **Delay** from the icon rail on the left of the panel (staggered bars):
 3. Choose **Start from**: Bottom, Top, or Random.
 4. Click **Apply**.
 
-Messages (done, or why it could not run) go to the log. Open it with the version button (`v1.7.3` and a list icon) at the bottom of the panel.
+Messages (done, or why it could not run) go to the log. Open it with the version button (`v1.7.4` and a list icon) at the bottom of the panel.
 
 Notes:
 
@@ -83,13 +83,13 @@ Notes:
    - The current movement is duplicated as `<name>_COPY` and fills the frames before the playhead, on its own layer. The new movement starts at the playhead, on a layer below it.
    - If the current movement runs in a classic tween, the copy stays in that tween on the same layer instead, so the motion keeps going.
    - Both layers show as outlines, and every layer except the new movement's is locked. Move the new movement, and set its first frame in **Properties > Looping** if needed, until it lines up with the copy.
-4. Click **Continue** (red). The locks from step 3 go (your own locked layers stay locked). A red ghost of the new movement appears one frame before it starts, and the copy opens on that frame. Re-pose the copy to match the ghost.
-5. Click **Done** (green). The panel leaves the copy, deletes the ghost, puts the playhead on the first frame of the transition and clears the Target.
+4. Click **Continue** (red). The locks from step 3 go (your own locked layers stay locked). The copy keeps its extra frame over the new movement, and opens on that frame (the playhead). The new movement stays an outline under it. Re-pose the copy to match the outline.
+5. Click **Done** (green). The panel leaves the copy, takes its extra frame off (the copy ends one frame before the new movement again), turns the outlines off, puts the playhead on the first frame of the transition and clears the Target.
 
 While Continue or Done waits, only that button and **Cancel** under it work; the pipette, the length and the Delay tool are off.
 
 - **Cancel** before Continue puts everything back as it was before Change Movement (layers, locks, and the `_COPY` symbol is deleted). A hidden `TF_BACKUP` guide layer holds the original layer until then.
-- **Cancel** before Done leaves the copy and deletes the ghost, but keeps the transition and the Target.
+- **Cancel** before Done works like Done (the transition stays), but keeps the Target.
 
 Notes:
 

@@ -275,15 +275,15 @@
 
     // --- One button, three steps ---
     // Change Movement (step 1), Continue (step 2, after lining up character2),
-    // Done (after the re-pose, while the ghost is there).
+    // Done (after the re-pose of the copy on the playhead frame).
     // The copy loops; play once may come back later.
     var STEPS = {
         create: { label: "Change Movement", call: null,
             title: "Create the transition: character2 starts at the playhead, the copy fills the frames before it" },
         "continue": { label: "Continue", call: "tfContinueTransition()",
-            title: "Ghost, then open the copy for the re-pose" },
+            title: "Open the copy on the playhead frame, over character2's outline, for the re-pose" },
         finish: { label: "Done", call: "tfFinishTransition()",
-            title: "Leave the copy and delete the ghost" }
+            title: "Leave the copy and take its extra frame off" }
     };
     var step = "create";
 
@@ -339,7 +339,7 @@
         });
     });
 
-    // tfPanelState: ghost flag, then pending step 2 flag. Step 2 wins over the ghost.
+    // tfPanelState: re-pose flag (Done), then line-up flag (Continue).
     function refreshMovement() {
         cs.evalScript("tfPanelState()", function (result) {
             result = result || "";
@@ -349,7 +349,7 @@
         });
     }
 
-    // Undo, deleting the ghost by hand or switching documents can change it
+    // Undo or switching documents can change it
     cs.addEventListener("com.adobe.events.flash.documentChanged", refreshMovement);
     cs.addEventListener("com.adobe.events.flash.timelineChanged", refreshMovement);
     window.addEventListener("focus", refreshMovement);
