@@ -10,7 +10,7 @@
 // Panel 1.7.2 - Change Movement locks other layers during its steps; Cancel; "Done" button
 // Panel 1.7.3 - Change Movement skips folder layers; panel state never shows an error dialog
 // Panel 1.7.4 - Change Movement re-poses the copy on the playhead frame over the movement 2 outline; no ghost layer
-// Panel 1.7.5 - Change Movement: Source and Target tiles with frame previews; the Source is found at the playhead
+// Panel 1.7.5 - Change Movement: Source and Target tiles with frame previews (emptied on Done); the Source is found at the playhead
 // ============================================================
 
 // ---- zeploy usage helper (begin): an unchanged copy of examples/usage/zeploy-usage.jsfl

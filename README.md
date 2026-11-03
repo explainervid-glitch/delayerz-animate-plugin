@@ -88,7 +88,7 @@ Notes:
    - If the current movement runs in a classic tween, the copy stays in that tween on the same layer instead, so the motion keeps going.
    - Both layers show as outlines, and every layer except the new movement's is locked. Move the new movement, and set its first frame in **Properties > Looping** if needed, until it lines up with the copy.
 4. Click **Continue** (red). The locks from step 3 go (your own locked layers stay locked). The copy keeps its extra frame over the new movement, and opens on that frame (the playhead). The new movement stays an outline under it. Re-pose the copy to match the outline.
-5. Click **Done** (green). The panel leaves the copy, takes its extra frame off (the copy ends one frame before the new movement again), turns the outlines off and puts the playhead on the first frame of the transition. The Target becomes the Source of the next change, and the Target tile empties.
+5. Click **Done** (green). The panel leaves the copy, takes its extra frame off (the copy ends one frame before the new movement again), turns the outlines off and puts the playhead on the first frame of the transition. The Source and Target tiles empty.
 
 While Continue or Done waits, only that button and **Cancel** under it work; the Source and Target tiles, the length and the Delay tool are off.
 

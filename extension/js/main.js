@@ -243,10 +243,9 @@
     slots.source.btn.addEventListener("click", function () { pick("source"); });
     slots.target.btn.addEventListener("click", function () { pick("target"); });
 
-    // After Done the character is in the Target movement: it becomes the
-    // Source of the next change, and the Target empties.
-    function nextMovement() {
-        setSlot("source", slots.target.name, slots.target.thumb);
+    // After Done both tiles empty, ready for the next change
+    function clearSlots() {
+        setSlot("source", "", "");
         setSlot("target", "", "");
         saveMovementSettings();
     }
@@ -372,7 +371,7 @@
         cs.evalScript(call, function (result) {
             setMovementBusy(false);
             handleResult(result);
-            if (finishing && result && result.indexOf("OK:") === 0) nextMovement();
+            if (finishing && result && result.indexOf("OK:") === 0) clearSlots();
             refreshMovement();
         });
     });
