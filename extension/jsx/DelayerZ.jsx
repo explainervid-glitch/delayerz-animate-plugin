@@ -8,6 +8,7 @@
 // Panel 1.7.0 - Animate 2021 and newer
 // Panel 1.7.1 - Change Movement keeps the copy in a classic tween; ghost follows the lined-up character2
 // Panel 1.7.2 - Change Movement locks other layers during its steps; Cancel; "Done" button
+// Panel 1.7.3 - Change Movement skips folder layers; panel state never shows an error dialog
 // ============================================================
 
 // ---- zeploy usage helper (begin): an unchanged copy of examples/usage/zeploy-usage.jsfl
@@ -116,7 +117,7 @@ var _lastOp = null;
 // "movement" per Change Movement (step 1), and an error when one fails unexpectedly. Validation messages ("select at
 // least 2 layers") are not counted. Keep the version in step with
 // CSXS/manifest.xml (npm run package checks it).
-var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.7.2");
+var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.7.3");
 
 // --- HELPER: Array.indexOf replacement (not available in ES3) ---
 function arrContains(arr, val) {
@@ -573,8 +574,10 @@ function tfFindItem(lib, path) {
 }
 
 // --- HELPER: is frame f a keyframe on this layer ---
+// Bounds use frames.length: a folder with layers inside reports a frameCount
+// but has no frames.
 function tfIsKeyframe(layer, f) {
-    return f < layer.frameCount && layer.frames[f].startFrame === f;
+    return f < layer.frames.length && layer.frames[f].startFrame === f;
 }
 
 // --- HELPER: same element, found again by symbol and position ---
@@ -602,7 +605,7 @@ function tfLocate(tl, el, f) {
 
     for (var o = 0; o < order.length; o++) {
         var layer = tl.layers[order[o]];
-        if (f >= layer.frameCount) continue;
+        if (f >= layer.frames.length) continue;
         var els = layer.frames[f].elements;
         for (var k = 0; k < els.length; k++) {
             if (tfSameElement(els[k], el)) return { layer: order[o], index: k };
@@ -688,10 +691,10 @@ function tfGhostTransitionStart(tl) {
     for (var i = 0; i < tl.layerCount - 1; i++) {
         var g = tl.layers[i];
         if (g.name !== TF_GHOST_NAME || g.layerType !== "guide") continue;
-        for (var f = 0; f < g.frameCount; f++) {
+        for (var f = 0; f < g.frames.length; f++) {
             if (g.frames[f].startFrame !== f || !g.frames[f].elements.length) continue;
             var copy = tl.layers[i + 1];
-            if (f >= copy.frameCount || !copy.frames[f].elements.length) return -1;
+            if (f >= copy.frames.length || !copy.frames[f].elements.length) return -1;
             var start = copy.frames[f].startFrame;
             var name = tfItemNameAt(copy, start);
             while (start > 0 && name && tfItemNameAt(copy, start - 1) === name) start = copy.frames[start - 1].startFrame;
@@ -1095,7 +1098,7 @@ function tfFindPendingLayers(tl, pend) {
     var targets = [];
     for (var i = 0; i < tl.layerCount; i++) {
         var layer = tl.layers[i];
-        if (pend.end >= layer.frameCount) continue;
+        if (pend.end >= layer.frames.length) continue;
         var els = layer.frames[pend.end].elements;
         if (els.length !== 1 || els[0].elementType !== "instance" || !els[0].libraryItem) continue;
         var name = els[0].libraryItem.name;
@@ -1194,16 +1197,21 @@ function tfContinueTransition() {
  * @returns {string}
  */
 function tfPanelState() {
-    var dom = fl.getDocumentDOM();
-    if (!dom) return "00";
-    var pending = "0";
-    var pend = tfReadPending(dom);
-    if (pend) {
-        var tl = dom.getTimeline();
-        if (tl.name !== pend.timeline || tfFindPendingLayers(tl, pend)) pending = "1";
-        else tfClearPending(dom);
+    // Runs on every document and timeline change: it must never show Animate's error dialog
+    try {
+        var dom = fl.getDocumentDOM();
+        if (!dom) return "00";
+        var pending = "0";
+        var pend = tfReadPending(dom);
+        if (pend) {
+            var tl = dom.getTimeline();
+            if (tl.name !== pend.timeline || tfFindPendingLayers(tl, pend)) pending = "1";
+            else tfClearPending(dom);
+        }
+        return tfHasGhost() + pending;
+    } catch (e) {
+        return "00";
     }
-    return tfHasGhost() + pending;
 }
 
 /**
