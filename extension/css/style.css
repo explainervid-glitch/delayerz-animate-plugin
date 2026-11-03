@@ -446,7 +446,6 @@ body.scrubbing * {
 /* ---- Movement: Source and Target tiles ---- */
 .slots {
     display: flex;
-    align-items: center;
 }
 
 .slot {
@@ -454,12 +453,6 @@ body.scrubbing * {
     min-width: 0;
     display: flex;
     flex-direction: column;
-}
-
-.slot-arrow {
-    flex: none;
-    padding-top: 6px; /* centre on the tiles, not on label + name */
-    color: var(--muted);
 }
 
 /* Pick button and frame preview in one */

@@ -77,7 +77,7 @@
             <!-- ===== Movement: change character1 to character2 at the playhead ===== -->
             <div class="tab-panel" id="tabMovement" role="tabpanel" aria-labelledby="tabMovementBtn" hidden>
 
-                <!-- Source (character1) to Target (character2). Each tile picks the selected
+                <!-- Source (character1) and Target (character2), side by side. Each tile picks the selected
                      symbol and shows the frame it shows; two instances on stage fill both. -->
                 <div class="slots">
                     <div class="slot">
@@ -95,7 +95,6 @@
                         </button>
                         <span class="slot-name slot-none" id="sourceName">none</span>
                     </div>
-                    <span class="slot-arrow" aria-hidden="true">&rarr;</span>
                     <div class="slot">
                         <span class="field-label">Target</span>
                         <button id="targetPick" type="button" class="slot-pick" data-slot="target"
@@ -136,7 +135,7 @@
             <!-- Footer: one button, version + log icon -->
             <div class="footer">
                 <button id="logBtn" type="button" title="Show log" aria-pressed="false" aria-controls="log">
-                    <span>v1.7.5</span>
+                    <span>v1.7.6</span>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
                         stroke-width="1.2" stroke-linecap="square" aria-hidden="true">
                         <path d="M1.5 2.5h9M1.5 6h9M1.5 9.5h6" />
