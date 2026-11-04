@@ -4,7 +4,7 @@ Stagger animations across layers in Adobe Animate with one click.
 
 - **Version:** 1.7.6
 - **Host:** Adobe Animate 2021 or newer (Windows)
-- **Ships as:** a dockable CEP panel (Delay and Movement tools) and a Commands menu script
+- **Ships as:** a dockable CEP panel (Delay, Movement and Swap tools) and a Commands menu script
 
 ## About
 
@@ -65,7 +65,7 @@ Open **Delay** from the icon rail on the left of the panel (staggered bars):
 3. Choose **Start from**: Bottom, Top, or Random.
 4. Click **Apply**.
 
-Messages (done, or why it could not run) go to the log. Open it with the version button (`v1.7.6` and a list icon) at the bottom of the panel.
+Messages (done, or why it could not run) go to the log. Open it with the log button (list icon) at the bottom of the icon rail; the panel version shows at the top of the log. A red dot on the log button means an error came in while the log was closed; it goes when the log opens.
 
 Notes:
 
@@ -102,14 +102,32 @@ Notes:
 - Continue only works in the timeline where Change Movement ran.
 - Previews are PNGs in `%LOCALAPPDATA%\Temp\DelayerZ`; ones older than a week are deleted at the next pick.
 
+### Swap
+
+**Swap** (two arrows in the icon rail) replaces one part inside a character with a part of another character, for example the chest of `WALK 08` with the chest of `DEMO 01`.
+
+1. **Source** (left): select the character the new part comes from, on stage (or its symbol in the Library), and click its pipette.
+2. **Target** (right): select the character to change the same way and click its pipette.
+3. Both characters' parts show in one box that scrolls as one: Source parts on the left, Target parts on the right, and matching parts on the same row (`CHEST` next to `CHEST copy`, `HAND L DEMO 01` next to `HAND L DEMO 02`). Click a Source part (the new part): the Target part on its row is picked with it. Click another Target part to replace that one instead.
+4. Click **Swap**. Inside the Target, the picked part becomes the Source part, on every keyframe of its layer. The Target list reads again afterwards.
+
+Notes:
+
+- Rows run head to toe (left arm and leg before the right ones). Parts match by the most leading words in common on the same side (L/R); a part with no match gets a row of its own. Hover a part for its full name and layer.
+- Position, transform, color effect, first frame and looping of the Target part stay; only the symbol changes.
+- The swap edits the Target symbol, so every instance of it changes.
+- Only the first level inside each character is listed; parts inside parts are not.
+- Two parts with the same name (in different Library folders) show their folder in the list.
+- Both characters stay picked when the panel reopens. In another document, each list shows why it cannot be read.
+
 ## Usage reporting
 
 DelayerZ counts how often it is used, for the team's zeploy dashboard. Each
 time a stagger is applied from the panel ("apply"), undone from the panel
-("undo"), or applied from the Commands menu ("command"), or a Change Movement is started
-("movement"), it appends one line
+("undo"), or applied from the Commands menu ("command"), a Change Movement is started
+("movement"), or a part is swapped ("swap"), it appends one line
 to `%LOCALAPPDATA%\zeploy\usage\com.zeus.delayerz.jsonl`; an unexpected
-error in apply, undo or a Change Movement step is counted as an error. The zeploy agent sends daily
+error in apply, undo, a Change Movement step or a swap is counted as an error. The zeploy agent sends daily
 totals to the admin app and deletes the file.
 
 - Only the plugin id, version, the event name and how long it took are
@@ -137,12 +155,12 @@ project folder under **Add package** in zeploy.
 proj_DelayerZ/
   extension/              CEP extension (installed as "DelayerZ")
     CSXS/manifest.xml     Extension manifest (host FLPR, Animate 2021+)
-    DelayerZ.html         Panel UI (icon rail: Delay and Movement)
+    DelayerZ.html         Panel UI (icon rail: Delay, Movement and Swap)
     css/style.css         Panel styles
     fonts/                IBM Plex Sans 400 + 600 (bundled, OFL.txt licence)
     js/main.js            Panel logic, talks to the JSX bridge
     js/CSInterface.js     Adobe CEP library
-    jsx/DelayerZ.jsx      Stagger, undo and Change Movement logic (runs inside Animate)
+    jsx/DelayerZ.jsx      Stagger, undo, Change Movement and Swap logic (runs inside Animate)
     jsfl/DelayerZ.jsfl    Stand-alone Commands menu version
   installer/
     install.bat           Launcher

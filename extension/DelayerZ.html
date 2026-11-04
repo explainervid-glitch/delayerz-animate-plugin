@@ -13,25 +13,46 @@
     <div class="shell">
 
         <!-- Tool rail: one icon per tool, the open one in blue. One tool at a time;
-             the footer and log on the right are shared. -->
-        <div class="tool-rail" role="tablist" aria-label="Tool" aria-orientation="vertical">
-            <button type="button" class="tool-btn" role="tab" id="tabDelayBtn" aria-controls="tabDelay"
-                aria-selected="true" title="Delay" aria-label="Delay">
-                <!-- Staggered bars -->
-                <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor"
-                    stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-                    <path d="M2 3.5h5M4.5 7h5M7 10.5h5" />
-                </svg>
-            </button>
-            <button type="button" class="tool-btn" role="tab" id="tabMovementBtn" aria-controls="tabMovement"
-                aria-selected="false" title="Movement" aria-label="Movement">
-                <!-- Tabler "walk", MIT License (tabler.io/icons) -->
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
-                    <path d="M7 21l3 -4" />
-                    <path d="M16 21l-2 -4l-3 -3l1 -6" />
-                    <path d="M6 12l2 -3l4 -1l3 3l3 1" />
+             the log button at the bottom opens the log for all of them. -->
+        <div class="tool-rail">
+            <div class="tool-tabs" role="tablist" aria-label="Tool" aria-orientation="vertical">
+                <button type="button" class="tool-btn" role="tab" id="tabDelayBtn" aria-controls="tabDelay"
+                    aria-selected="true" title="Delay" aria-label="Delay">
+                    <!-- Staggered bars -->
+                    <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor"
+                        stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+                        <path d="M2 3.5h5M4.5 7h5M7 10.5h5" />
+                    </svg>
+                </button>
+                <button type="button" class="tool-btn" role="tab" id="tabMovementBtn" aria-controls="tabMovement"
+                    aria-selected="false" title="Movement" aria-label="Movement">
+                    <!-- Tabler "walk", MIT License (tabler.io/icons) -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                        <path d="M7 21l3 -4" />
+                        <path d="M16 21l-2 -4l-3 -3l1 -6" />
+                        <path d="M6 12l2 -3l4 -1l3 3l3 1" />
+                    </svg>
+                </button>
+                <button type="button" class="tool-btn" role="tab" id="tabSwapBtn" aria-controls="tabSwap"
+                    aria-selected="false" title="Swap" aria-label="Swap">
+                    <!-- Lucide "arrow-left-right" v0.460.0, ISC License (lucide.dev) -->
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M8 3 4 7l4 4" />
+                        <path d="M4 7h16" />
+                        <path d="m16 21 4-4-4-4" />
+                        <path d="M20 17H4" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Log button: a red dot shows an error the log has not shown yet -->
+            <button id="logBtn" type="button" class="tool-btn" title="Show log" aria-label="Log" aria-pressed="false" aria-controls="log">
+                <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+                    stroke-width="1.2" stroke-linecap="square" aria-hidden="true">
+                    <path d="M1.5 2.5h9M1.5 6h9M1.5 9.5h6" />
                 </svg>
             </button>
         </div>
@@ -132,20 +153,66 @@
                 <button id="cancelBtn" type="button" class="cancel-link" hidden>Cancel</button>
             </div>
 
-            <!-- Footer: one button, version + log icon -->
-            <div class="footer">
-                <button id="logBtn" type="button" title="Show log" aria-pressed="false" aria-controls="log">
-                    <span>v1.7.6</span>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"
-                        stroke-width="1.2" stroke-linecap="square" aria-hidden="true">
-                        <path d="M1.5 2.5h9M1.5 6h9M1.5 9.5h6" />
-                    </svg>
-                </button>
+            <!-- ===== Swap: one part inside the Target becomes a part of the Source ===== -->
+            <div class="tab-panel" id="tabSwap" role="tabpanel" aria-labelledby="tabSwapBtn" hidden>
+
+                <!-- Source on the left, Target on the right -->
+                <div class="sw-cols">
+                    <!-- Source character: the new part comes from it -->
+                    <div class="field">
+                        <span class="field-label">Source</span>
+                        <div class="pick-row">
+                            <span class="pick-name slot-none" id="swSourceName">none</span>
+                            <button id="swSourcePick" type="button" class="pick-icon"
+                                title="Pick the character the new part comes from: select it on stage (or in the Library), then click" aria-label="Pick Source">
+                                <!-- Lucide "pipette" v0.460.0, ISC License (lucide.dev) -->
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="m2 22 1-1h3l9-9" />
+                                    <path d="M3 21v-3l9-9" />
+                                    <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Target character: its picked part gets replaced -->
+                    <div class="field">
+                        <span class="field-label">Target</span>
+                        <div class="pick-row">
+                            <span class="pick-name slot-none" id="swTargetName">none</span>
+                            <button id="swTargetPick" type="button" class="pick-icon"
+                                title="Pick the character to change: select it on stage (or in the Library), then click" aria-label="Pick Target">
+                                <!-- Lucide "pipette" v0.460.0, ISC License (lucide.dev) -->
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="m2 22 1-1h3l9-9" />
+                                    <path d="M3 21v-3l9-9" />
+                                    <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Both lists in one box: Source parts on the left, Target parts on the
+                     right, matching parts on one row -->
+                <div class="pair-list" id="swPairs">
+                    <div class="part-empty">Pick a Source and a Target.</div>
+                </div>
+
+                <!-- Swap: needs one part picked on each side -->
+                <div class="actions">
+                    <button id="swapBtn" type="button" disabled title="Inside the Target, the picked part becomes the picked Source part">Swap</button>
+                </div>
             </div>
 
-            <!-- Log (hidden until the log button opens it), under the footer -->
+            <!-- Log (hidden until the log button opens it): version, then messages -->
             <div id="log" class="log" hidden>
-                <div class="log-empty">No messages yet.</div>
+                <div class="log-version">DelayerZ v1.7.6</div>
+                <div id="logList">
+                    <div class="log-empty">No messages yet.</div>
+                </div>
             </div>
 
         </div>

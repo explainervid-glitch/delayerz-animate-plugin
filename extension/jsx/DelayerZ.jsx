@@ -1337,3 +1337,160 @@ function tfCancelTransition() {
         return "ERROR: " + e;
     }
 }
+
+// ============================================================
+// SWAP: swap one part inside the Target character for a part of the Source
+// ============================================================
+// The panel lists the surface parts (the symbols right inside) of a Source
+// and a Target character, head to toe. The animator picks one part in each
+// list and clicks Swap: inside the Target, that part becomes the Source part,
+// on every keyframe of its layer.
+//
+// swReadParts(path)                               parts of a character: the selected symbol, or `path`
+// swSwapPart(target, li, layer, oldPath, newPath)  inside `target`, oldPath becomes newPath
+// ============================================================
+
+// --- HELPER: words of a symbol's own name ("BODY COMP/HAND L DEMO 01" -> HAND, L, DEMO, 01) ---
+function swWords(path) {
+    var raw = tfShortName(path).toUpperCase().split(/[\s_\-]+/);
+    var words = [];
+    for (var i = 0; i < raw.length; i++) if (raw[i]) words.push(raw[i]);
+    return words;
+}
+
+var SW_SIDES = { L: "L", LEFT: "L", R: "R", RIGHT: "R" };
+
+function swSide(words) {
+    for (var i = 0; i < words.length; i++) if (SW_SIDES[words[i]]) return SW_SIDES[words[i]];
+    return "";
+}
+
+// --- Head-to-toe order of the parts list, by the first word of the name (or folder) ---
+// Arms and legs go left side first; unknown words after the body, then shadow and controllers.
+var SW_ORDER = {
+    HEAD: 10, HAIR: 11, FACE: 12, NECK: 20,
+    CHEST: 30, BODY: 31, TORSO: 31, OUTFIT: 32,
+    ARM: 40, UPPERARM: 40, SHOULDER: 40, FOREARM: 41, HAND: 42,
+    HIP: 50, PELVIS: 50, SKIRT: 51,
+    THIGH: 60, LEG: 60, CALF: 61, SHIN: 61, FOOT: 62,
+    SHADOW: 90, MAIN: 95, CONTROLLER: 95
+};
+var SW_UNKNOWN = 80;
+
+function swRank(path) {
+    var words = swWords(path);
+    var rank = SW_ORDER[words[0]];
+    if (rank === undefined) {
+        var folder = String(path).split("/");
+        rank = folder.length > 1 ? SW_ORDER[folder[folder.length - 2].toUpperCase()] : undefined;
+    }
+    if (rank === undefined) return SW_UNKNOWN;
+    // Right arm and leg after the whole left one
+    if (rank >= 40 && rank < 70 && swSide(words) === "R") rank += 5;
+    return rank;
+}
+
+/**
+ * Parts of a character: per layer (guides and folders skipped), the symbols
+ * on its first keyframe with content, head to toe.
+ * @param {string} path - library path of the character; "" reads the selected instance (or the one Library item)
+ * @returns {string} - "OK: <character path>", then one line per part
+ *                     ("layer index\tlayer name\telement index\tpart path\thead-to-toe rank"), or "ERROR: ..."
+ */
+function swReadParts(path) {
+    try {
+        var dom = fl.getDocumentDOM();
+        if (!dom) return "ERROR: No document open.";
+        var item = null;
+        if (path) {
+            item = tfFindItem(dom.library, path);
+            if (!item) return "ERROR: \"" + path + "\" is not in this document's library. Pick a character again.";
+        } else {
+            var sel = dom.selection;
+            if (sel.length === 1 && sel[0].elementType === "instance" && sel[0].instanceType === "symbol") {
+                item = sel[0].libraryItem;
+            } else if (!sel.length) {
+                var items = dom.library.getSelectedItems();
+                if (items.length === 1 && items[0].timeline) item = items[0];
+            }
+            if (!item) return "ERROR: Select one character instance on stage (or its symbol in the Library), then Pick.";
+        }
+
+        var tl = item.timeline;
+        var lines = ["OK: " + item.name];
+        for (var li = 0; li < tl.layerCount; li++) {
+            var layer = tl.layers[li];
+            if (layer.layerType === "folder" || layer.layerType === "guide") continue;
+            var parts = [];
+            for (var f = 0; f < layer.frames.length; f = layer.frames[f].startFrame + layer.frames[f].duration) {
+                var els = layer.frames[f].elements;
+                if (!els.length) continue;
+                for (var k = 0; k < els.length; k++) {
+                    if (els[k].elementType === "instance" && els[k].libraryItem) {
+                        parts.push({ k: k, name: els[k].libraryItem.name, rank: swRank(els[k].libraryItem.name) });
+                    }
+                }
+                break;
+            }
+            parts.sort(function (x, y) { return x.rank - y.rank || x.k - y.k; });
+            for (var p = 0; p < parts.length; p++) lines.push(li + "\t" + layer.name + "\t" + parts[p].k + "\t" + parts[p].name + "\t" + parts[p].rank);
+        }
+        if (lines.length === 1) return "ERROR: " + tfShortName(item.name) + " has no symbols inside.";
+        return lines.join("\n");
+    } catch (e) {
+        return "ERROR: " + e;
+    }
+}
+
+/**
+ * Swap, inside the Target character, part `oldPath` for `newPath` on every
+ * keyframe of its layer (by position and name, else the first layer with
+ * that name). Only the symbol changes: first frame, looping, transform and
+ * color stay.
+ * @param {string} targetPath - library path of the Target character
+ * @param {number} layerIndex - the part's layer position in the Target
+ * @param {string} layerName  - that layer's name
+ * @param {string} oldPath    - library path of the Target part to replace
+ * @param {string} newPath    - library path of the Source part to put in
+ * @returns {string} - "OK: ...", "INFO: ..." or "ERROR: ..."
+ */
+function swSwapPart(targetPath, layerIndex, layerName, oldPath, newPath) {
+    var usageStart = new Date().getTime();
+    try {
+        var dom = fl.getDocumentDOM();
+        if (!dom) return "ERROR: No document open.";
+        var targetName = tfShortName(targetPath);
+        if (oldPath === newPath) return "INFO: " + targetName + " already has " + tfShortName(newPath) + " there.";
+        var target = tfFindItem(dom.library, targetPath);
+        if (!target || !target.timeline) return "ERROR: \"" + targetPath + "\" is not in this document's library. Pick the Target again.";
+        var part = tfFindItem(dom.library, newPath);
+        if (!part) return "ERROR: \"" + newPath + "\" is not in this document's library. Pick the Source again.";
+
+        var tl = target.timeline;
+        layerIndex = parseInt(layerIndex, 10);
+        var li = -1;
+        if (layerIndex < tl.layerCount && tl.layers[layerIndex].name === layerName) li = layerIndex;
+        for (var i = 0; li === -1 && i < tl.layerCount; i++) {
+            if (tl.layers[i].name === layerName) li = i;
+        }
+        if (li === -1) return "ERROR: " + targetName + " has no layer \"" + layerName + "\" any more. Pick the Target again.";
+
+        var layer = tl.layers[li];
+        var swapped = 0;
+        for (var f = 0; f < layer.frames.length; f = layer.frames[f].startFrame + layer.frames[f].duration) {
+            var els = layer.frames[f].elements;
+            for (var k = 0; k < els.length; k++) {
+                if (els[k].elementType !== "instance" || !els[k].libraryItem || els[k].libraryItem.name !== oldPath) continue;
+                els[k].libraryItem = part;
+                swapped++;
+            }
+        }
+        if (!swapped) return "ERROR: " + targetName + " has no " + tfShortName(oldPath) + " on layer \"" + layerName + "\" any more. Pick the Target again.";
+        delayerzUsage.action("swap", new Date().getTime() - usageStart);
+        return "OK: " + targetName + ": " + tfShortName(oldPath) + " swapped for " + tfShortName(newPath) +
+            (swapped > 1 ? " on " + swapped + " keyframes." : ".");
+    } catch (e) {
+        delayerzUsage.error("swap");
+        return "ERROR: " + e;
+    }
+}

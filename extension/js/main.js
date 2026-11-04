@@ -12,6 +12,7 @@
     var undoBtn = document.getElementById("undoBtn");
     var delayInput = document.getElementById("delay");
     var logEl = document.getElementById("log");
+    var logListEl = document.getElementById("logList");
     var logBtn = document.getElementById("logBtn");
 
     var DELAY_MIN = 1;
@@ -118,13 +119,14 @@
     delayInput.addEventListener("blur", clampDelay);
 
     // ============================================================
-    // Tools: Delay | Movement, picked from the icon rail on the left.
+    // Tools: Delay | Movement | Swap, picked from the icon rail on the left.
     // The last tool used opens next time.
     // ============================================================
     var TAB_KEY = "delayerz.tab";
     var tabs = {
         delay: { btn: document.getElementById("tabDelayBtn"), panel: document.getElementById("tabDelay") },
-        movement: { btn: document.getElementById("tabMovementBtn"), panel: document.getElementById("tabMovement") }
+        movement: { btn: document.getElementById("tabMovementBtn"), panel: document.getElementById("tabMovement") },
+        swap: { btn: document.getElementById("tabSwapBtn"), panel: document.getElementById("tabSwap") }
     };
 
     function showTab(name) {
@@ -142,9 +144,11 @@
 
     tabs.delay.btn.addEventListener("click", function () { showTab("delay"); });
     tabs.movement.btn.addEventListener("click", function () { showTab("movement"); });
+    tabs.swap.btn.addEventListener("click", function () { showTab("swap"); });
 
     try {
-        if (localStorage.getItem(TAB_KEY) === "movement") showTab("movement");
+        var lastTab = localStorage.getItem(TAB_KEY);
+        if (lastTab === "movement" || lastTab === "swap") showTab(lastTab);
     } catch (e) { }
 
     // ============================================================
@@ -336,7 +340,7 @@
     }
 
     // While Continue or Done waits, only that button and Cancel work: no
-    // new target, no new length, no Delay tool.
+    // new target, no new length, no Delay or Swap tool.
     function setStepFocus(on) {
         cancelBtn.hidden = !on;
         slots.source.btn.disabled = on;
@@ -344,6 +348,7 @@
         lengthInput.disabled = on;
         lengthCell.classList.toggle("locked", on);
         tabs.delay.btn.disabled = on;
+        tabs.swap.btn.disabled = on;
         if (on && tabs.movement.panel.hidden) showTab("movement");
     }
 
@@ -403,8 +408,250 @@
         return '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
     }
 
+    // ============================================================
+    // Swap: inside the Target, one picked part becomes a picked Source part
+    // ============================================================
+    var swapBtn = document.getElementById("swapBtn");
+    var pairsEl = document.getElementById("swPairs");
+    var SWAP_KEY = "delayerz.swap";
+
+    // path:  the character's library path ("" = not picked)
+    // parts: its list lines (layer index, layer name, index, part path, head-to-toe rank)
+    // part:  the picked line, or null
+    // note:  why its parts cannot be shown (another document), or ""
+    var sides = {
+        source: { path: "", parts: [], part: null, note: "" },
+        target: { path: "", parts: [], part: null, note: "" }
+    };
+    ["source", "target"].forEach(function (side) {
+        var id = side === "source" ? "Source" : "Target";
+        sides[side].nameEl = document.getElementById("sw" + id + "Name");
+        sides[side].pickBtn = document.getElementById("sw" + id + "Pick");
+        sides[side].pickBtn.addEventListener("click", function () { readParts(side, ""); });
+    });
+
+    // Both characters, remembered per PC; their parts are read again from the open document
+    function saveSwap() {
+        try {
+            localStorage.setItem(SWAP_KEY, JSON.stringify({ source: sides.source.path, target: sides.target.path }));
+        } catch (e) {
+            // Not saved; the panel keeps working.
+        }
+    }
+
+    function setSide(side, path) {
+        var s = sides[side];
+        s.path = path || "";
+        s.nameEl.textContent = s.path ? s.path.split("/").pop() : "none";
+        s.nameEl.classList.toggle("slot-none", !s.path);
+        if (s.path) s.nameEl.title = s.path;
+        else s.nameEl.removeAttribute("title");
+    }
+
+    // --- Rows: a Source part and the Target part that matches it ---
+    // Same head-to-toe rank, then the most leading words in common on the
+    // same side ("HAND L DEMO 01" with "HAND L DEMO 02", "CHEST" with
+    // "CHEST copy"). A part without a match gets a row of its own. A Source
+    // part only pairs; the animator can still pick any part on either side.
+    function nameWords(path) {
+        return path.split("/").pop().toUpperCase().split(/[\s_\-]+/).filter(Boolean);
+    }
+
+    function nameSide(words) {
+        for (var i = 0; i < words.length; i++) {
+            if (words[i] === "L" || words[i] === "LEFT") return "L";
+            if (words[i] === "R" || words[i] === "RIGHT") return "R";
+        }
+        return "";
+    }
+
+    function wordsInCommon(a, b) {
+        var x = nameWords(a), y = nameWords(b);
+        if (nameSide(x) !== nameSide(y)) return 0;
+        var n = 0;
+        while (n < x.length && n < y.length && x[n] === y[n]) n++;
+        return n;
+    }
+
+    function pairRows(src, tgt) {
+        var ranks = [];
+        src.concat(tgt).forEach(function (f) {
+            var r = +f[4];
+            if (ranks.indexOf(r) === -1) ranks.push(r);
+        });
+        ranks.sort(function (a, b) { return a - b; });
+        var rows = [];
+        ranks.forEach(function (r) {
+            var s = src.filter(function (f) { return +f[4] === r; });
+            var t = tgt.filter(function (f) { return +f[4] === r; });
+            var used = [];
+            s.forEach(function (f) {
+                var best = -1, score = 0;
+                for (var j = 0; j < t.length; j++) {
+                    if (used.indexOf(j) !== -1) continue;
+                    var c = wordsInCommon(f[3], t[j][3]);
+                    // A tie goes to a different symbol: that is the one worth swapping
+                    var better = c > score || (c && c === score && t[best][3] === f[3] && t[j][3] !== f[3]);
+                    if (better) { best = j; score = c; }
+                }
+                if (best !== -1) used.push(best);
+                rows.push([f, best === -1 ? null : t[best]]);
+            });
+            t.forEach(function (f, j) {
+                if (used.indexOf(j) === -1) rows.push([null, f]);
+            });
+        });
+        return rows;
+    }
+
+    function samePart(a, b) {
+        return !!a && !!b && a[0] === b[0] && a[2] === b[2] && a[3] === b[3];
+    }
+
+    // Two parts of one character with the same name show their Library folder too
+    function labelsFor(parts) {
+        var seen = {};
+        parts.forEach(function (f) {
+            var short = f[3].split("/").pop();
+            seen[short] = (seen[short] || 0) + 1;
+        });
+        return function (f) {
+            var folders = f[3].split("/");
+            var label = folders.pop();
+            if (seen[label] > 1) label += " (" + (folders.length ? folders.join("/") : "Library root") + ")";
+            return label;
+        };
+    }
+
+    function emptyCell(text) {
+        var cell = document.createElement("div");
+        cell.className = "part-empty";
+        cell.textContent = text || "";
+        return cell;
+    }
+
+    function renderPairs() {
+        var src = sides.source, tgt = sides.target;
+        pairsEl.textContent = "";
+        if (!src.parts.length && !tgt.parts.length) {
+            var row0 = document.createElement("div");
+            row0.className = "pair-row";
+            row0.appendChild(emptyCell(src.note || "Not picked yet."));
+            row0.appendChild(emptyCell(tgt.note || "Not picked yet."));
+            pairsEl.appendChild(row0);
+            updateSwapBtn();
+            return;
+        }
+        var labels = { source: labelsFor(src.parts), target: labelsFor(tgt.parts) };
+        var rows = pairRows(src.parts, tgt.parts);
+        rows.forEach(function (pair, n) {
+            var row = document.createElement("div");
+            row.className = "pair-row";
+            ["source", "target"].forEach(function (side, c) {
+                var f = pair[c];
+                if (!f) {
+                    // First row of an empty side says why it is empty
+                    row.appendChild(emptyCell(n === 0 && !sides[side].parts.length ? sides[side].note || "Not picked yet." : ""));
+                    return;
+                }
+                var btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "part-item";
+                btn.classList.toggle("selected", samePart(f, sides[side].part));
+                btn.title = f[3] + " (layer " + f[1] + ")";
+                btn.textContent = labels[side](f);
+                btn.addEventListener("click", function () {
+                    sides[side].part = f;
+                    // A Source part also picks the Target part on its row
+                    if (side === "source" && pair[1]) sides.target.part = pair[1];
+                    renderPairs();
+                });
+                row.appendChild(btn);
+            });
+            pairsEl.appendChild(row);
+        });
+        updateSwapBtn();
+    }
+
+    // swReadParts: "OK: <path>", then the part lines. A picked part stays
+    // picked when it is still in the list.
+    function showParts(side, result) {
+        var s = sides[side];
+        var lines = result.split("\n");
+        var path = lines[0].substring(4);
+        var keep = path === s.path ? s.part : null;
+        setSide(side, path);
+        s.note = "";
+        s.parts = lines.slice(1).map(function (line) { return line.split("\t"); });
+        s.part = null;
+        s.parts.forEach(function (f) { if (samePart(f, keep)) s.part = f; });
+        renderPairs();
+    }
+
+    // path "" reads the selection (Pick); a remembered path is read quietly
+    function readParts(side, path) {
+        cs.evalScript("swReadParts(" + quote(path) + ")", function (result) {
+            if (result && result.indexOf("OK: ") === 0) {
+                showParts(side, result);
+                saveSwap();
+                if (!path) addLog((side === "source" ? "Source: " : "Target: ") + sides[side].path, "info");
+            } else if (!path) {
+                handleResult(result);
+            } else {
+                // Another document is open: the character stays picked for when it comes back
+                var s = sides[side];
+                s.parts = [];
+                s.part = null;
+                s.note = String(result || "").replace(/^ERROR: /, "");
+                renderPairs();
+            }
+        });
+    }
+
+    function updateSwapBtn() {
+        swapBtn.disabled = !(sides.source.part && sides.target.part);
+    }
+
+    function setSwapBusy(busy) {
+        sides.source.pickBtn.disabled = sides.target.pickBtn.disabled = busy;
+        var items = pairsEl.querySelectorAll(".part-item");
+        for (var i = 0; i < items.length; i++) items[i].disabled = busy;
+        if (busy) swapBtn.disabled = true;
+        else updateSwapBtn();
+    }
+
+    // The Target is read again afterwards: its picked part has a new name
+    swapBtn.addEventListener("click", function () {
+        var t = sides.target.part;
+        setSwapBusy(true);
+        cs.evalScript("swSwapPart(" + quote(sides.target.path) + ", " + t[0] + ", " + quote(t[1]) + ", " +
+            quote(t[3]) + ", " + quote(sides.source.part[3]) + ")", function (result) {
+            setSwapBusy(false);
+            handleResult(result);
+            sides.target.part = null;
+            readParts("target", sides.target.path);
+        });
+    });
+
+    // 1.8 kept only the Source, as a plain path
+    try {
+        var savedSwap = localStorage.getItem(SWAP_KEY) || "";
+        var saved = savedSwap.charAt(0) === "{" ? JSON.parse(savedSwap) : { source: savedSwap };
+        setSide("source", saved.source);
+        setSide("target", saved.target);
+    } catch (e) { }
+
+    function refreshSwap() {
+        ["source", "target"].forEach(function (side) {
+            if (sides[side].path) readParts(side, sides[side].path);
+        });
+    }
+    refreshSwap();
+    cs.addEventListener("com.adobe.events.flash.documentChanged", refreshSwap);
+
     // --- Log: hidden by default, opened with the log button ---
-    // Newest entry first, last 20 kept. No new-message marker on the button.
+    // Newest entry first, last 20 kept. An error while the log is closed puts
+    // a red dot on the button until the log opens.
     logBtn.addEventListener("click", function () {
         setLogOpen(logEl.hidden);
     });
@@ -413,11 +660,13 @@
         logEl.hidden = !open;
         logBtn.setAttribute("aria-pressed", open ? "true" : "false");
         logBtn.title = open ? "Hide log" : "Show log";
+        if (open) logBtn.classList.remove("has-error");
     }
 
     function addLog(msg, type) {
-        var empty = logEl.querySelector(".log-empty");
-        if (empty) logEl.removeChild(empty);
+        var empty = logListEl.querySelector(".log-empty");
+        if (empty) logListEl.removeChild(empty);
+        if (type === "error" && logEl.hidden) logBtn.classList.add("has-error");
 
         var row = document.createElement("div");
         row.className = "log-entry " + type;
@@ -427,9 +676,9 @@
         text.textContent = msg;
         row.appendChild(time);
         row.appendChild(text);
-        logEl.insertBefore(row, logEl.firstChild);
+        logListEl.insertBefore(row, logListEl.firstChild);
 
-        while (logEl.children.length > LOG_MAX) logEl.removeChild(logEl.lastChild);
+        while (logListEl.children.length > LOG_MAX) logListEl.removeChild(logListEl.lastChild);
     }
 
     function clockTime(d) {

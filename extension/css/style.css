@@ -61,6 +61,30 @@ body {
     user-select: none;
 }
 
+/* ---- Scrollbars (Swap list, log): thin and dark, like Animate's own panels ---- */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4a4a4a;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #5e5e5e;
+}
+
+::-webkit-scrollbar-button {
+    display: none;
+}
+
 /* ---- Layout: tool rail on the left, the open tool on the right ---- */
 .shell {
     height: 100%;
@@ -140,6 +164,35 @@ body {
 
 .tool-btn[data-step="continue"]::after { background: var(--warning); }
 .tool-btn[data-step="finish"]::after   { background: var(--done); }
+
+/* Tool icons at the top, the log button at the bottom */
+.tool-tabs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#logBtn {
+    margin-top: auto;
+    margin-bottom: 8px;
+}
+
+#logBtn[aria-pressed="true"] {
+    color: var(--text);
+    background: var(--surface-hover);
+}
+
+/* Red dot: an error came in while the log was closed */
+#logBtn.has-error::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--error);
+}
 
 /* One tab's controls, spaced like the panel itself */
 .tab-panel {
@@ -322,7 +375,8 @@ body.scrubbing * {
 }
 
 #applyBtn,
-#movementBtn {
+#movementBtn,
+#swapBtn {
     flex: 1;
     border: 0;
     background: var(--accent);
@@ -331,7 +385,8 @@ body.scrubbing * {
 }
 
 #applyBtn:hover:not(:disabled),
-#movementBtn:hover:not(:disabled) {
+#movementBtn:hover:not(:disabled),
+#swapBtn:hover:not(:disabled) {
     background: var(--accent-hover);
 }
 
@@ -369,49 +424,10 @@ body.scrubbing * {
     cursor: default;
 }
 
-/* ---- Footer: version + log button, right under the buttons ---- */
-.footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    font-size: 10px;
-    color: var(--muted);
-}
-
-/* Version and log icon in one button: "v1.6.0 ≡" */
-#logBtn {
-    position: relative;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    padding: 0 4px;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--radius);
-    color: var(--muted);
-    font: inherit;
-    cursor: pointer;
-}
-
-#logBtn:focus {
-    outline: none;
-}
-
-#logBtn:hover {
-    color: var(--text);
-    border-color: var(--border);
-}
-
-#logBtn[aria-pressed="true"] {
-    color: var(--text);
-    background: var(--surface);
-    border-color: var(--border);
-}
-
-/* ---- Log: under the footer, fills the rest of the panel; newest entry first ---- */
+/* ---- Log: under the open tool, fills the rest of the panel; newest entry first ---- */
 .log {
     flex: 1;
-    min-height: 0;
+    min-height: 72px; /* stays readable under a long Swap list */
     overflow-y: auto;
     padding-top: 6px;
     border-top: 1px solid var(--border);
@@ -442,7 +458,12 @@ body.scrubbing * {
     color: var(--muted);
 }
 
-/* ---- Movement: [Target: ANGRY 02][pick], then [30 f], then [Change Movement] ---- */
+.log-version {
+    padding-bottom: 4px;
+    font-size: 10px;
+    color: var(--muted);
+}
+
 /* ---- Movement: Source and Target tiles ---- */
 .slots {
     display: flex;
@@ -515,6 +536,147 @@ body.scrubbing * {
     color: var(--muted);
 }
 
+/* ---- Swap: [name][pick], then the parts list ---- */
+.pick-row {
+    display: flex;
+}
+
+.pick-name {
+    flex: 1;
+    min-width: 0;
+    height: var(--control-h);
+    line-height: calc(var(--control-h) - 2px);
+    padding: 0 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--info);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pick-name.slot-none {
+    color: var(--muted);
+}
+
+.pick-icon {
+    width: var(--control-h);
+    height: var(--control-h);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.pick-icon:focus {
+    outline: none;
+}
+
+.pick-icon:hover:not(:disabled) {
+    background: var(--surface-hover);
+}
+
+.pick-icon:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* Swap: Source and Target side by side, in smaller type than the other tools */
+.sw-cols {
+    display: flex;
+}
+
+.sw-cols > .field {
+    flex: 1;
+    min-width: 0;
+}
+
+#tabSwap .pick-name {
+    height: 22px;
+    line-height: 20px;
+    padding: 0 4px;
+    font-size: 11px;
+}
+
+#tabSwap .pick-icon {
+    width: 22px;
+    height: 22px;
+}
+
+/* One box for both lists: a row holds a Source part and its matching Target
+   part; it scrolls as one */
+.pair-list {
+    max-height: 60vh;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 11px;
+}
+
+.pair-row {
+    display: flex;
+}
+
+.pair-row + .pair-row {
+    border-top: 1px solid var(--border);
+}
+
+.pair-row > * {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Line between the Source and Target columns */
+.pair-row > :first-child {
+    border-right: 1px solid var(--border);
+}
+
+.part-item {
+    display: block;
+    padding: 1px 4px;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.part-item:hover:not(:disabled) {
+    background: var(--surface-hover);
+}
+
+.part-item:focus {
+    outline: none;
+}
+
+.part-item.selected,
+.part-item.selected:hover:not(:disabled) {
+    background: var(--accent);
+    color: #fff;
+}
+
+.part-item:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.part-empty {
+    padding: 1px 4px;
+    color: var(--muted);
+}
+
 /* Length cell locked while a step waits */
 .stepper-value.locked {
     opacity: 0.4;
@@ -562,15 +724,15 @@ body.scrubbing * {
    old for gap in flex layouts (needs Chromium 84). ---- */
 .panel > * + *      { margin-top: 10px; }
 .panel > .tab-panel + .tab-panel { margin-top: 0; } /* only one tool shows at a time */
-.panel > .footer,
 .panel > .log       { margin-top: 6px; }
 .tab-panel > * + *  { margin-top: 10px; }
 .tab-panel > .cancel-link { margin-top: 4px; }
 .field > * + *      { margin-top: 4px; }
-.tool-rail > * + *  { margin-top: 4px; }
+.tool-tabs > * + *  { margin-top: 4px; }
 .actions > * + *    { margin-left: 6px; }
 .slots > * + *      { margin-left: 6px; }
+.pick-row > * + *   { margin-left: 4px; }
+.sw-cols > * + *    { margin-left: 4px; }
 .slot > * + *       { margin-top: 4px; }
 .stepper-value > * + * { margin-left: 2px; }
-#logBtn > * + *     { margin-left: 5px; }
 .log-entry > * + *  { margin-left: 6px; }
