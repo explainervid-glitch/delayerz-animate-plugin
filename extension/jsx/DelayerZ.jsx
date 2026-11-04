@@ -12,6 +12,7 @@
 // Panel 1.7.4 - Change Movement re-poses the copy on the playhead frame over the movement 2 outline; no ghost layer
 // Panel 1.7.5 - Change Movement: Source and Target tiles with frame previews (emptied on Done); the Source is found at the playhead
 // Panel 1.7.6 - Change Movement: Source and Target tiles side by side, no arrow
+// Panel 1.8.0 - Swap tool (sw* functions at the end of this file); log button in the icon rail with an error dot
 // ============================================================
 
 // ---- zeploy usage helper (begin): an unchanged copy of examples/usage/zeploy-usage.jsfl
@@ -120,7 +121,7 @@ var _lastOp = null;
 // "movement" per Change Movement (step 1), and an error when one fails unexpectedly. Validation messages ("select at
 // least 2 layers") are not counted. Keep the version in step with
 // CSXS/manifest.xml (npm run package checks it).
-var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.7.6");
+var delayerzUsage = zeployUsageV1("com.zeus.delayerz", "1.8.0");
 
 // --- HELPER: Array.indexOf replacement (not available in ES3) ---
 function arrContains(arr, val) {

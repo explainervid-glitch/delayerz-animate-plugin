@@ -633,7 +633,7 @@
         });
     });
 
-    // 1.8 kept only the Source, as a plain path
+    // A test build before 1.8.0 kept only the Source, as a plain path
     try {
         var savedSwap = localStorage.getItem(SWAP_KEY) || "";
         var saved = savedSwap.charAt(0) === "{" ? JSON.parse(savedSwap) : { source: savedSwap };
